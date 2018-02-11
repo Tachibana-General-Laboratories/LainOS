@@ -45,8 +45,14 @@ $(RUST_DEBUG_LIB): $(RUST_DEPS)
 	$(XARGO) build --target=$(TARGET)
 $(RUST_RELEASE_LIB): $(RUST_DEPS)
 	$(XARGO) build --release --target=$(TARGET)
+
+ifeq ($(DEBUG),1)
+$(RUST_LIB): $(RUST_DEBUG_LIB) | $(BUILD_DIR)
+	cp $< $@
+else
 $(RUST_LIB): $(RUST_RELEASE_LIB) | $(BUILD_DIR)
 	cp $< $@
+endif
 
 $(KERNEL).elf: $(EXT_DEPS) $(RUST_LIB)
 	$(CROSS)-ld $(LDFLAGS) $^ -T $(LD_LAYOUT) -o $@
