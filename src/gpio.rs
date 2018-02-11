@@ -2,6 +2,7 @@ use core::intrinsics::{volatile_load, volatile_store};
 use core::mem::uninitialized;
 use core::ops::{BitAnd, BitAndAssign, BitOr, BitOrAssign};
 use core::marker::PhantomData;
+use core::ptr;
 
 pub const MMIO_BASE: usize = 0x3F000000;
 
@@ -45,5 +46,22 @@ impl<T> Mmio<T> {
     #[inline(always)]
     pub fn write(&mut self, value: T) {
         unsafe { volatile_store(self.addr as *mut T, value) }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct Volatile<T: Copy>(T);
+
+impl<T: Copy> Volatile<T> {
+    pub const fn new(value: T) -> Self {
+        Volatile(value)
+    }
+
+    pub fn read(&self) -> T {
+        unsafe { ptr::read_volatile(&self.0) }
+    }
+
+    pub fn write(&mut self, value: T) {
+        unsafe { ptr::write_volatile(&mut self.0, value) };
     }
 }

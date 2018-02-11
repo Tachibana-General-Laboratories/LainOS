@@ -13,7 +13,7 @@ pub const UART0_ICR: Mmio<u32> =       Mmio::new(MMIO_BASE+0x00201044);
 
 fn nop_delay(r: u32) {
     for _ in 0..r {
-        unsafe { asm!("nop" ::: "volatile"); }
+        unsafe { asm!("nop" :::: "volatile"); }
     }
 }
 
@@ -58,7 +58,7 @@ pub fn init() {
 pub fn send(c: u8) {
     // wait until we can send
     while {
-        unsafe { asm!("nop" ::: "volatile"); }
+        unsafe { asm!("nop" :::: "volatile"); }
         UART0_FR.read() & 0x20 != 0
     } {}
     // write the character to the buffer
@@ -69,7 +69,7 @@ pub fn send(c: u8) {
 pub fn receive() -> u8 {
     // wait until something is in the buffer
     while {
-        unsafe { asm!("nop" ::: "volatile"); }
+        unsafe { asm!("nop" :::: "volatile"); }
         UART0_FR.read() & 0x10 != 0
     } {}
     // read it and return

@@ -9,6 +9,7 @@ LDFLAGS ?= --gc-sections -static -nostdlib -nostartfiles --no-dynamic-linker
 XARGO ?= CARGO_INCREMENTAL=0 RUST_TARGET_PATH="$(shell pwd)" xargo
 
 LD_LAYOUT := ext/layout.ld
+BUILD_DIR := build
 
 RUST_BINARY := $(shell cat Cargo.toml | grep name | cut -d\" -f 2 | tr - _)
 RUST_BUILD_DIR := target/$(TARGET)
@@ -18,8 +19,6 @@ RUST_LIB := $(BUILD_DIR)/$(RUST_BINARY).a
 
 RUST_DEPS = Xargo.toml Cargo.toml build.rs $(LD_LAYOUT) src/*
 EXT_DEPS := ext/start.o
-
-BUILD_DIR := build
 
 KERNEL := $(RUST_BUILD_DIR)/$(RUST_BINARY)
 
@@ -46,10 +45,10 @@ $(RUST_DEBUG_LIB): $(RUST_DEPS)
 	$(XARGO) build --target=$(TARGET)
 $(RUST_RELEASE_LIB): $(RUST_DEPS)
 	$(XARGO) build --release --target=$(TARGET)
-$(RUST_LIB): $(RUST_DEBUG_LIB)
-	@cp $< $@
+$(RUST_LIB): $(RUST_RELEASE_LIB) $(BUILD_DIR)
+	cp $< $@
 
-$(KERNEL).elf: $(EXT_DEPS) $(RUST_DEBUG_LIB)
+$(KERNEL).elf: $(EXT_DEPS) $(RUST_LIB)
 	$(CROSS)-ld $(LDFLAGS) $^ -T $(LD_LAYOUT) -o $@
 $(KERNEL).img: $(KERNEL).elf
 	$(CROSS)-objcopy -O binary $< $@
