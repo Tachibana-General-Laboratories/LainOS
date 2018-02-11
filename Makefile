@@ -18,9 +18,9 @@ RUST_RELEASE_LIB := $(RUST_BUILD_DIR)/release/lib$(RUST_BINARY).a
 RUST_LIB := $(BUILD_DIR)/$(RUST_BINARY).a
 
 RUST_DEPS = Xargo.toml Cargo.toml build.rs $(LD_LAYOUT) src/*
-EXT_DEPS := ext/start.o
+EXT_DEPS := build/start.o
 
-KERNEL := $(RUST_BUILD_DIR)/$(RUST_BINARY)
+KERNEL := $(BUILD_DIR)/$(RUST_BINARY)
 
 .PHONY: all qemu clean
 
@@ -38,14 +38,14 @@ clean:
 $(BUILD_DIR):
 	mkdir -p $@
 
-$(BUILD_DIR)/%.o: %.S
-	$(CROSS)-gcc $(CCFLAGS) -c $< -o ext/$@
+$(BUILD_DIR)/%.o: %.S | $(BUILD_DIR)
+	$(CROSS)-gcc $(CCFLAGS) -c $< -o $@
 
 $(RUST_DEBUG_LIB): $(RUST_DEPS)
 	$(XARGO) build --target=$(TARGET)
 $(RUST_RELEASE_LIB): $(RUST_DEPS)
 	$(XARGO) build --release --target=$(TARGET)
-$(RUST_LIB): $(RUST_RELEASE_LIB) $(BUILD_DIR)
+$(RUST_LIB): $(RUST_RELEASE_LIB) | $(BUILD_DIR)
 	cp $< $@
 
 $(KERNEL).elf: $(EXT_DEPS) $(RUST_LIB)
