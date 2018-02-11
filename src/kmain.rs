@@ -30,11 +30,16 @@ pub extern "C" fn kernel_main(_r0: u32, _r1: u32, _atags: u32) {
         x_offset: 0,
         y_offset: 0,
         depth: 32,
-        rgb: true,
+        rgb: false,
     };
 
     if let Some(lfb) = lfb::init(info) {
-        lfb.fill_rgba(0xCC6666_99);
+        lfb.fill_rgba(0xFF0000);
+        unsafe {
+            use core::mem::transmute;
+            let font = transmute::<*const u8, &'static lfb::Font>(lfb::FONT.as_ptr());
+            font.uprint(lfb, 10, 5, "Prepare uranus!", 0x00FF00, 0x0000FF);
+        }
     } else {
         println!("Unable to set screen resolution to 1024x768x32");
     }

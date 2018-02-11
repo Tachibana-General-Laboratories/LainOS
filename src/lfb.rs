@@ -1,10 +1,10 @@
 use mbox;
 
 pub struct Lfb {
+    lfb: *mut u8,
     width: u32,
     height: u32,
     pitch: u32,
-    lfb: *mut u8,
 }
 
 impl Lfb {
@@ -98,5 +98,72 @@ pub fn init(info: FrameBufferInfo) -> Option<Lfb> {
         })
     } else {
         None
+    }
+}
+
+//extern volatile unsigned char _binary_font_psf_start;
+
+/// PC Screen Font as used by Linux Console
+#[repr(packed)]
+pub struct Font {
+    magic: u32,
+    version: u32,
+    headersize: u32,
+    flags: u32,
+    numglyph: u32,
+    bytesperglyph: u32,
+    height: u32,
+    width: u32,
+    glyphs: u8,
+}
+
+pub static FONT: &[u8] = include_bytes!("../font.psf");
+
+impl Font {
+    pub unsafe fn uprint(&self, fb: Lfb, mut x: isize, mut y: isize, s: &str, fg: u32, bg: u32) {
+        let bytesperline = (self.width+7)/8;
+
+        // draw next character if it's not zero
+        for c in s.chars() {
+            // get the offset of the glyph. Need to adjust this to support unicode table
+            let mut glyph: *const u8 = (self as *const Self as *const u8).offset(
+                (self.headersize as isize) +
+                (self.bytesperglyph as isize) *
+                (if (c as u32) < self.numglyph { c as isize } else { 0 })
+            );
+
+            // calculate the offset on screen
+            let width = self.width as isize;
+            let height = self.height as isize;
+            let pitch = fb.pitch as isize;
+            let mut offs = y * height * pitch + x * (width) * 4;
+
+            // handle carrige return
+            if c == '\r' {
+                x = 0;
+            } else if c == '\n' { // new line
+                x = 0;
+                y += 1;
+            } else {
+                // display a character
+                for _ in 0..self.height {
+                    // display one row
+                    let mut line = offs;
+                    let mut mask = 1 << (self.width-1);
+                    for _ in 0..self.width {
+                        // if bit set, we use white color, otherwise black
+                        *(fb.lfb.offset(line) as *mut u32) =
+                            if ((*glyph) as u32) & mask != 0 { fg } else { bg };
+                        mask >>= 1;
+                        line += 4;
+                    }
+                    // adjust to next line
+                    glyph = glyph.offset(bytesperline as isize);
+                    offs += pitch;
+                }
+
+                x += 1;
+            }
+        }
     }
 }
