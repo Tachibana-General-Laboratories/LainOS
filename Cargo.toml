@@ -10,6 +10,7 @@ path = "src/kmain.rs"
 panic = "abort"
 lto = true
 debug = true
+opt-level = 1
 
 [profile.test]
 panic = "abort"
@@ -19,10 +20,11 @@ debug = true
 [profile.release]
 panic = "abort"
 lto = true
+#opt-level = 1
+opt-level = 2
 
 [dependencies]
 spin = "*"
 #pi = { path = "../pi", features = ["std"] }
 
-# from assignment 1
-#stack-vec = { path = "../../1-shell/stack-vec/" }
+stack-vec = { path = "stack-vec" }

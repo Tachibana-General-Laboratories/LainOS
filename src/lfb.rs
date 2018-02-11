@@ -1,4 +1,5 @@
 use mbox;
+use core::ptr;
 
 pub struct Lfb {
     lfb: *mut u8,
@@ -14,7 +15,7 @@ impl Lfb {
         for _ in 0..self.height {
             for _ in 0..self.width {
                 unsafe {
-                    *(p as *mut u32) = rgba;
+                    ptr::write(p as *mut u32, rgba);
                     p = p.offset(4);
                 }
             }
@@ -101,8 +102,6 @@ pub fn init(info: FrameBufferInfo) -> Option<Lfb> {
     }
 }
 
-//extern volatile unsigned char _binary_font_psf_start;
-
 /// PC Screen Font as used by Linux Console
 #[repr(packed)]
 pub struct Font {
@@ -114,7 +113,6 @@ pub struct Font {
     bytesperglyph: u32,
     height: u32,
     width: u32,
-    glyphs: u8,
 }
 
 pub static FONT: &[u8] = include_bytes!("../font.psf");

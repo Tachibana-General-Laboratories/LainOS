@@ -22,18 +22,22 @@ EXT_DEPS := build/start.o
 
 KERNEL := $(BUILD_DIR)/$(RUST_BINARY)
 
-.PHONY: all qemu clean
+.PHONY: all qemu clean check
 
 VPATH = ext
 
 all: $(KERNEL).img
 
 qemu: all
-	qemu-system-aarch64 -M raspi3 -kernel $(KERNEL).img -serial stdio #-d in_asm
+	#qemu-system-aarch64 -M raspi3 -serial mon:stdio -kernel $(KERNEL).img   #-d in_asm
+	qemu-system-aarch64 -M raspi3 -kernel $(KERNEL).img   #-d in_asm
 
 clean:
 	$(XARGO) clean
 	rm -rf $(BUILD_DIR)
+
+check:
+	$(XARGO) check --target=$(TARGET)
 
 $(BUILD_DIR):
 	mkdir -p $@

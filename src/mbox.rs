@@ -25,9 +25,9 @@ pub enum Channel {
 
 // tags
 pub const TAG_GETSERIAL: u32 =      0x10004;
+pub const TAG_SETPOWER: u32 =       0x28001;
 pub const TAG_SETCLKRATE: u32 =     0x38002;
 pub const TAG_LAST: u32 =           0;
-
 
 const VIDEOCORE_MBOX: usize = MMIO_BASE + 0x0000B880;
 

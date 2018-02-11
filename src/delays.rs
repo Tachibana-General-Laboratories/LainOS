@@ -24,7 +24,7 @@ pub fn wait_msec(n: u32) {
         // read the current counter
         asm!("mrs $0, cntpct_el0" : "=r"(t) : : : "volatile");
         // calculate expire value for counter
-        t += ((f / 1000) * n) / 1000;
+        t += ((f / 1000).wrapping_mul(n)) / 1000;
         while {
             asm!("mrs $0, cntpct_el0" : "=r"(r) : : : "volatile");
             r < t
