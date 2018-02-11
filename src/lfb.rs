@@ -35,7 +35,7 @@ pub struct FrameBufferInfo {
 }
 
 pub fn init(info: FrameBufferInfo) -> Option<Lfb> {
-    let mut b = unsafe { &mut mbox::BUFFER };
+    let b = unsafe { &mut mbox::BUFFER };
 
     b[ 0].write(35*4);
     b[ 1].write(mbox::REQUEST);
@@ -84,7 +84,9 @@ pub fn init(info: FrameBufferInfo) -> Option<Lfb> {
 
     b[34].write(mbox::TAG_LAST);
 
-    if mbox::call(mbox::Channel::PROP1) && b[20].read() == 32 && b[28].read() != 0 {
+    let val = unsafe { mbox::call(mbox::Channel::PROP1) };
+
+    if val && b[20].read() == 32 && b[28].read() != 0 {
         let w = b[28].read() & 0x3FFFFFFF;
         b[28].write(w);
 
@@ -98,25 +100,3 @@ pub fn init(info: FrameBufferInfo) -> Option<Lfb> {
         None
     }
 }
-
-/*
-/**
- * Show a picture
- */
-void lfb_showpicture()
-{
-    int x,y;
-    unsigned char *ptr=lfb;
-    char *data=homer_data, pixel[4];
-
-    ptr += (height-homer_height)/2*pitch + (width-homer_width)*2;
-    for(y=0;y<homer_height;y++) {
-        for(x=0;x<homer_width;x++) {
-            HEADER_PIXEL(data, pixel);
-            *((unsigned int*)ptr)=*((unsigned int *)&pixel);
-            ptr+=4;
-        }
-        ptr+=pitch-homer_width*4;
-    }
-}
-*/

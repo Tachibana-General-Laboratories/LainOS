@@ -10,8 +10,7 @@ pub unsafe extern fn memcpy(dest: *mut u8, src: *const u8,
 }
 
 #[no_mangle]
-pub unsafe extern fn memmove(dest: *mut u8, src: *const u8,
-                             n: usize) -> *mut u8 {
+pub unsafe extern fn memmove(dest: *mut u8, src: *const u8, n: usize) -> *mut u8 {
     if src < dest as *const u8 { // copy from end
         let mut i = n;
         while i != 0 {

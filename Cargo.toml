@@ -20,7 +20,8 @@ debug = true
 panic = "abort"
 lto = true
 
-#[dependencies]
+[dependencies]
+spin = "*"
 #pi = { path = "../pi", features = ["std"] }
 
 # from assignment 1

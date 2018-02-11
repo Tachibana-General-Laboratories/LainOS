@@ -5,9 +5,10 @@
 #![no_std]
 #![no_builtins]
 
-use core::intrinsics::{volatile_load, volatile_store};
-use core::slice::from_raw_parts_mut;
+extern crate spin;
 
+#[macro_use]
+pub mod print;
 pub mod externs;
 pub mod panic;
 
@@ -19,7 +20,7 @@ pub mod lfb;
 #[no_mangle]
 pub extern "C" fn kernel_main(_r0: u32, _r1: u32, _atags: u32) {
     uart0::init();
-    uart0::puts("Hello Rust Kernel world!\n");
+    println!("Hello Rust Kernel world! 0x{:X}", 0xDEAD);
 
     let info = lfb::FrameBufferInfo {
         width: 1024,
@@ -35,7 +36,7 @@ pub extern "C" fn kernel_main(_r0: u32, _r1: u32, _atags: u32) {
     if let Some(lfb) = lfb::init(info) {
         lfb.fill_rgba(0xCC6666_99);
     } else {
-        uart0::puts("Unable to set screen resolution to 1024x768x32\n");
+        println!("Unable to set screen resolution to 1024x768x32");
     }
 
     loop {

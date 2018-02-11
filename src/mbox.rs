@@ -1,7 +1,5 @@
 use gpio::*;
 
-use core::convert::AsRef;
-
 //extern volatile unsigned int mbox[36];
 
 //volatile unsigned int  __attribute__((aligned(16))) mbox[36];
@@ -45,36 +43,33 @@ const MBOX_FULL: u32 =       0x8000_0000;
 const MBOX_EMPTY: u32 =      0x4000_0000;
 
 /// Make a mailbox call. Returns 0 on failure, non-zero on success
-pub fn call(ch: Channel) -> bool {
-    unsafe {
-        let ch = ch as u8;
+pub unsafe fn call(ch: Channel) -> bool {
+    let ch = ch as u8;
 
-        // wait until we can write to the mailbox
+    // wait until we can write to the mailbox
+    while {
+        asm!("nop" :::: "volatile");
+        MBOX_STATUS.read() & MBOX_FULL != 0
+    } {}
+
+    // write the address of our message to the mailbox with channel identifier
+    //MBOX_WRITE.write((((unsigned int)((unsigned long)&mbox)&~0xF) | (ch & 0xF));
+    let addr = (&BUFFER) as *const [Volatile<u32>; 36] as u32;
+    MBOX_WRITE.write((addr & !0xF) | (ch & 0xF) as u32);
+
+    // now wait for the response
+    loop {
+        // is there a response?
         while {
-            unsafe { asm!("nop" :::: "volatile"); }
-            MBOX_STATUS.read() & MBOX_FULL != 0
+            asm!("nop" :::: "volatile");
+            MBOX_STATUS.read() & MBOX_EMPTY != 0
         } {}
 
-        // write the address of our message to the mailbox with channel identifier
-        //MBOX_WRITE.write((((unsigned int)((unsigned long)&mbox)&~0xF) | (ch & 0xF));
-        let addr = (&BUFFER) as *const [Volatile<u32>; 36] as u32;
-        MBOX_WRITE.write((addr & !0xF) | (ch & 0xF) as u32);
-
-        // now wait for the response
-        loop {
-            // is there a response?
-            while {
-                asm!("nop" :::: "volatile");
-                MBOX_STATUS.read() & MBOX_EMPTY != 0
-            } {}
-
-            let r = MBOX_READ.read();
-            // is it a response to our message?
-            if (r & 0xF) as u8 == ch && (r & !0xF) == addr {
-                // is it a valid successful response?
-                return BUFFER[1].read() == MBOX_RESPONSE;
-            }
+        let r = MBOX_READ.read();
+        // is it a response to our message?
+        if (r & 0xF) as u8 == ch && (r & !0xF) == addr {
+            // is it a valid successful response?
+            return BUFFER[1].read() == MBOX_RESPONSE;
         }
-        false
     }
 }

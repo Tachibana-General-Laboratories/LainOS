@@ -1,4 +1,5 @@
 use gpio::*;
+use mbox;
 
 // PL011 UART registers
 pub const UART0_DR: Mmio<u8> =        Mmio::new(MMIO_BASE+0x00201000);
@@ -22,20 +23,20 @@ pub fn init() {
     // initialize UART
     UART0_CR.write(0);         // turn off UART0
 
-    /*
     // set up clock for consistent divisor values
-    mbox[0] = 8*4;
-    mbox[1] = MBOX_REQUEST;
-    mbox[2] = MBOX_TAG_SETCLKRATE; // set clock rate
-    mbox[3] = 12;
-    mbox[4] = 8;
-    mbox[5] = 2;           // UART clock
-    mbox[6] = 4000000;     // 4Mhz
-    mbox[7] = MBOX_TAG_LAST;
-    mbox_call(MBOX_CH_PROP);
-    */
+    unsafe {
+        mbox::BUFFER[0].write(8*4);
+        mbox::BUFFER[1].write(mbox::REQUEST);
+        mbox::BUFFER[2].write(mbox::TAG_SETCLKRATE); // set clock rate
+        mbox::BUFFER[3].write(12);
+        mbox::BUFFER[4].write(8);
+        mbox::BUFFER[5].write(2);           // UART clock
+        mbox::BUFFER[6].write(4000000);     // 4Mhz
+        mbox::BUFFER[7].write(mbox::TAG_LAST);
+        mbox::call(mbox::Channel::PROP1);
+    }
 
-    /* map UART0 to GPIO pins */
+    // map UART0 to GPIO pins
     let mut r = GPFSEL1.read();
     r &= !(7<<12 | 7<<15); // gpio14, gpio15
     r |= 4<<12 | 4<<15;    // alt0
@@ -74,15 +75,4 @@ pub fn receive() -> u8 {
     } {}
     // read it and return
     UART0_DR.read()
-}
-
-/// Display a string
-pub fn puts(msg: &str) {
-    for c in msg.chars() {
-        // convert newline to carrige return + newline
-        if c == '\n' {
-            send(b'\r');
-        }
-        send(c as u8)
-    }
 }

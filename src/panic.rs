@@ -8,7 +8,6 @@ pub extern "C" fn eh_personality() {}
 #[lang = "panic_fmt"]
 #[no_mangle]
 pub extern fn rust_begin_unwind(msg: fmt::Arguments, file: &'static str, line: u32) -> ! {
-    /*
     println!("\n\nPANIC {}:{}:", file, line);
     println!("    {}", msg);
 
@@ -17,7 +16,6 @@ pub extern fn rust_begin_unwind(msg: fmt::Arguments, file: &'static str, line: u
     //unsafe { interrupt::stack_trace(); }
 
     println!("HALT");
-    */
 
     loop {
         // TODO

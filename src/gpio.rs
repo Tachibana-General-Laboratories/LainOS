@@ -1,6 +1,4 @@
 use core::intrinsics::{volatile_load, volatile_store};
-use core::mem::uninitialized;
-use core::ops::{BitAnd, BitAndAssign, BitOr, BitOrAssign};
 use core::marker::PhantomData;
 use core::ptr;
 
