@@ -45,12 +45,22 @@ _start:
     orr     x0, x0, #(1 << 1)   // SWIO hardwired on Pi3
     msr     hcr_el2, x0
     mrs     x0, hcr_el2
+    // Setup SCTLR access
+    mov     x2, #0x0800
+    movk    x2, #0x30d0, lsl #16
+    msr     sctlr_el1, x2
+    // set up exception handlers
+    ldr     x2, =_vectors
+    msr     vbar_el1, x2
+
+    /*
     // change execution level to EL1
     mov     x2, #0x3c4
     msr     spsr_el2, x2
     adr     x2, 5f
     msr     elr_el2, x2
     eret
+    */
 
 5:  mov     sp, x1
 
@@ -66,3 +76,42 @@ _start:
 4:  bl      kernel_main
     // for failsafe, halt this core too
     b       1b
+
+    // important, code has to be properly aligned
+    .align 11
+_vectors:
+    // synchronous
+    .align  7
+    mov     x0, #0
+    mrs     x1, esr_el1
+    mrs     x2, elr_el1
+    mrs     x3, spsr_el1
+    mrs     x4, far_el1
+    b       exception_handler
+
+    // IRQ
+    .align  7
+    mov     x0, #1
+    mrs     x1, esr_el1
+    mrs     x2, elr_el1
+    mrs     x3, spsr_el1
+    mrs     x4, far_el1
+    b       exception_handler
+
+    // FIQ
+    .align  7
+    mov     x0, #2
+    mrs     x1, esr_el1
+    mrs     x2, elr_el1
+    mrs     x3, spsr_el1
+    mrs     x4, far_el1
+    b       exception_handler
+
+    // SError
+    .align  7
+    mov     x0, #3
+    mrs     x1, esr_el1
+    mrs     x2, elr_el1
+    mrs     x3, spsr_el1
+    mrs     x4, far_el1
+    b       exception_handler

@@ -2,6 +2,20 @@
 name = "lainos"
 version = "0.1.0"
 
+[workspace]
+members = [
+	"stack-vec",
+	"volatile",
+]
+
+[dependencies]
+spin = "*"
+slab_allocator = "0.3.0"
+#pi = { path = "../pi", features = ["std"] }
+
+stack-vec = { path = "stack-vec" }
+volatile = { path = "volatile" }
+
 [lib]
 crate-type = ["staticlib"]
 path = "src/kmain.rs"
@@ -22,9 +36,3 @@ panic = "abort"
 lto = true
 #opt-level = 1
 opt-level = 2
-
-[dependencies]
-spin = "*"
-#pi = { path = "../pi", features = ["std"] }
-
-stack-vec = { path = "stack-vec" }

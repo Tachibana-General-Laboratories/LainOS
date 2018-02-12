@@ -9,3 +9,6 @@ stage = 1
 #[dependencies.std]
 #path = "../std"
 #stage = 2
+
+[target.raspi3-lainos.dependencies]
+alloc = {}

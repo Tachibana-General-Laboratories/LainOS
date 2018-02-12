@@ -1,19 +1,20 @@
 use gpio::*;
 use mbox;
-use delays;
+use util;
 
-const PM_RSTC: Mmio<u32> = Mmio::new(MMIO_BASE + 0x0010001c);
-const PM_RSTS: Mmio<u32> = Mmio::new(MMIO_BASE + 0x00100020);
-const PM_WDOG: Mmio<u32> = Mmio::new(MMIO_BASE + 0x00100024);
+use volatile::prelude::*;
+
+const PM_RSTC: Mmio<u32> = Mmio::new(IO_BASE + 0x0010001c);
+const PM_RSTS: Mmio<u32> = Mmio::new(IO_BASE + 0x00100020);
+const PM_WDOG: Mmio<u32> = Mmio::new(IO_BASE + 0x00100024);
 
 const PM_WDOG_MAGIC: u32   = 0x5a000000;
 const PM_RSTC_FULLRST: u32 = 0x00000020;
 
 /// Shutdown the board
 pub fn power_off() {
-    let b = unsafe { &mut mbox::BUFFER };
-
     // power off devices one by one
+    let mut b = mbox::Mailbox::new();
     for device_id in 0..16 {
         b[0].write(8*4);
         b[1].write(mbox::REQUEST);
@@ -23,9 +24,7 @@ pub fn power_off() {
         b[5].write(device_id);   // device id
         b[6].write(0);           // bit 0: off, bit 1: no wait
         b[7].write(mbox::TAG_LAST);
-        unsafe {
-            mbox::call(mbox::Channel::PROP1);
-        }
+        b.call(mbox::Channel::PROP1).unwrap();
     }
 
     // power off gpio pins (but not VCC pins)
@@ -36,11 +35,11 @@ pub fn power_off() {
     GPFSEL4.write(0);
     GPFSEL5.write(0);
     GPPUD.write(0);
-    delays::wait_cycles(150);
+    util::wait_cycles(150);
 
     GPPUDCLK0.write(0xffffffff);
     GPPUDCLK1.write(0xffffffff);
-    delays::wait_cycles(150);
+    util::wait_cycles(150);
 
     // flush GPIO setup
     GPPUDCLK0.write(0);

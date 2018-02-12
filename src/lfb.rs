@@ -1,6 +1,8 @@
 use mbox;
 use core::ptr;
 
+use volatile::prelude::*;
+
 pub struct Lfb {
     lfb: *mut u8,
     width: u32,
@@ -36,7 +38,7 @@ pub struct FrameBufferInfo {
 }
 
 pub fn init(info: FrameBufferInfo) -> Option<Lfb> {
-    let b = unsafe { &mut mbox::BUFFER };
+    let mut b = mbox::Mailbox::new();
 
     b[ 0].write(35*4);
     b[ 1].write(mbox::REQUEST);
@@ -85,7 +87,7 @@ pub fn init(info: FrameBufferInfo) -> Option<Lfb> {
 
     b[34].write(mbox::TAG_LAST);
 
-    let val = unsafe { mbox::call(mbox::Channel::PROP1) };
+    let val = b.call(mbox::Channel::PROP1).is_ok();
 
     if val && b[20].read() == 32 && b[28].read() != 0 {
         let w = b[28].read() & 0x3FFFFFFF;

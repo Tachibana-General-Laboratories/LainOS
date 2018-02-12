@@ -2,6 +2,7 @@ use stack_vec::StackVec;
 use core::str::from_utf8;
 
 use uart0;
+use util;
 use power;
 
 /// Error type for `Command` parse failures.
@@ -81,7 +82,7 @@ pub fn shell(prefix: &str) -> ! {
             }
             c @ 32...126 => {
                 if !buf.is_full() {
-                    buf.push(c);
+                    buf.push(c).unwrap();
                     uart0::send(c);
                 }
             }
@@ -92,15 +93,9 @@ pub fn shell(prefix: &str) -> ! {
 
 fn run_cmd(cmd: Command) {
     match cmd.path() {
-        "echo" => {
-            for (i, arg) in cmd.args.iter().enumerate() {
-                match i {
-                    0 => (),
-                    1 => print!("{}", arg),
-                    _ => print!(" {}", arg),
-                }
-            }
-        }
+        "echo" => echo(cmd.args),
+        "ls" => ls(cmd.args),
+        "dump" => dump(cmd.args),
         "poweroff" => {
             print!("power-off the machine\n");
             power::power_off();
@@ -111,4 +106,36 @@ fn run_cmd(cmd: Command) {
         }
         _ => print!("unknown command: {}", cmd.path()),
     }
+}
+
+fn echo<'a>(args: StackVec<'a, &'a str>) {
+    for (i, arg) in args.iter().enumerate() {
+        match i {
+            0 => (),
+            1 => print!("{}", arg),
+            _ => print!(" {}", arg),
+        }
+    }
+}
+
+fn ls<'a>(args: StackVec<'a, &'a str>) {
+    println!("  no file system yet;   but... maybe {} is:", args[1]);
+    match args[1] {
+        "/" => print!("bin etc sys usr var"),
+        _ => print!("ls: cannot access '{}': No such file or directory", args[1]),
+    }
+}
+
+
+fn dump<'a>(args: StackVec<'a, &'a str>) {
+    if args.len() != 3 {
+        println!("usage:");
+        print!  ("    dump <hex addr> <size=512>");
+        return;
+    }
+
+    let size = usize::from_str_radix(args[2], 10).unwrap_or(0);
+    let addr = usize::from_str_radix(args[1], 16).unwrap_or(512);
+
+    util::dump(unsafe { addr as *mut u8 }, size);
 }

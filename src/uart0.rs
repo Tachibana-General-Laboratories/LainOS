@@ -1,22 +1,51 @@
 use gpio::*;
 use mbox;
+use util;
+
+use volatile::prelude::*;
+
+/*
+use gpio::MMIO_BASE as IO_BASE;
+use volatile::prelude::*;
+use volatile::{Volatile, Reserved};
+
+
+#[repr(C)]
+#[allow(non_snake_case)]
+struct Registers {
+    DR: Volatile<u32>,          // Data register
+    RSRECR: [Reserved<u32>, 5],
+
+    FR: Volatile<u32>,          // Flag register
+    ILPR: Reserved<u32>,
+    IBRD: Volatile<u32>,        // Integer Baud rate divisor
+    FBRD: Volatile<u32>,        // Fractional Baud rate divisor
+    LCRH: Volatile<u32>,        // Line Control register
+    CR: Volatile<u32>,          // Control register
+    IFLS: Reserved<u32>,        // Interupt FIFO Level Select Register
+    IMSC: Volatile<u32>,        // Interupt Mask Set Clear Register
+    RIS: Reserved<u32>,         // Raw Interupt Status Register
+    MIS: Reserved<u32>,         // Masked Interupt Status Register
+    ICR: Volatile<u32>,         // Interupt Clear Register
+    DMACR: Reserved<u32>,       // DMA Control Register
+    ITCR: Reserved<u32>,        // Test Control register
+    ITIP: Reserved<u32>,        // Integration test input reg
+    ITOP: Reserved<u32>,        // Integration test output reg
+    TDR: Reserved<u32>,         // Test Data reg
+}
+*/
+
 
 // PL011 UART registers
-pub const UART0_DR: Mmio<u8> =        Mmio::new(MMIO_BASE+0x00201000);
-pub const UART0_FR: Mmio<u8> =        Mmio::new(MMIO_BASE+0x00201018);
+pub const UART0_DR: Mmio<u8> =        Mmio::new(IO_BASE+0x00201000);
+pub const UART0_FR: Mmio<u8> =        Mmio::new(IO_BASE+0x00201018);
 
-pub const UART0_IBRD: Mmio<u32> =      Mmio::new(MMIO_BASE+0x00201024);
-pub const UART0_FBRD: Mmio<u32> =      Mmio::new(MMIO_BASE+0x00201028);
-pub const UART0_LCRH: Mmio<u32> =      Mmio::new(MMIO_BASE+0x0020102C);
-pub const UART0_CR: Mmio<u32> =        Mmio::new(MMIO_BASE+0x00201030);
-pub const UART0_IMSC: Mmio<u32> =      Mmio::new(MMIO_BASE+0x00201038);
-pub const UART0_ICR: Mmio<u32> =       Mmio::new(MMIO_BASE+0x00201044);
-
-fn nop_delay(r: u32) {
-    for _ in 0..r {
-        unsafe { asm!("nop" :::: "volatile"); }
-    }
-}
+pub const UART0_IBRD: Mmio<u32> =      Mmio::new(IO_BASE+0x00201024);
+pub const UART0_FBRD: Mmio<u32> =      Mmio::new(IO_BASE+0x00201028);
+pub const UART0_LCRH: Mmio<u32> =      Mmio::new(IO_BASE+0x0020102C);
+pub const UART0_CR: Mmio<u32> =        Mmio::new(IO_BASE+0x00201030);
+pub const UART0_IMSC: Mmio<u32> =      Mmio::new(IO_BASE+0x00201038);
+pub const UART0_ICR: Mmio<u32> =       Mmio::new(IO_BASE+0x00201044);
 
 /// Set baud rate and characteristics (115200 8N1) and map to GPIO
 pub fn init() {
@@ -24,17 +53,16 @@ pub fn init() {
     UART0_CR.write(0);         // turn off UART0
 
     // set up clock for consistent divisor values
-    unsafe {
-        mbox::BUFFER[0].write(8*4);
-        mbox::BUFFER[1].write(mbox::REQUEST);
-        mbox::BUFFER[2].write(mbox::TAG_SETCLKRATE); // set clock rate
-        mbox::BUFFER[3].write(12);
-        mbox::BUFFER[4].write(8);
-        mbox::BUFFER[5].write(2);           // UART clock
-        mbox::BUFFER[6].write(4000000);     // 4Mhz
-        mbox::BUFFER[7].write(mbox::TAG_LAST);
-        mbox::call(mbox::Channel::PROP1);
-    }
+    let mut b = mbox::Mailbox::new();
+    b[0].write(8 * 4);
+    b[1].write(mbox::REQUEST);
+    b[2].write(mbox::TAG_SETCLKRATE); // set clock rate
+    b[3].write(12);
+    b[4].write(8);
+    b[5].write(2);           // UART clock
+    b[6].write(4000000);     // 4Mhz
+    b[7].write(mbox::TAG_LAST);
+    b.call(mbox::Channel::PROP1).unwrap();
 
     // map UART0 to GPIO pins
     let mut r = GPFSEL1.read();
@@ -43,9 +71,9 @@ pub fn init() {
     GPFSEL1.write(r);
 
     GPPUD.write(0);            // enable pins 14 and 15
-    nop_delay(150);
+    util::wait_cycles(150);
     GPPUDCLK0.write(1<<14 | 1<<15);
-    nop_delay(150);
+    util::wait_cycles(150);
     GPPUDCLK0.write(0);        // flush GPIO setup
 
     UART0_ICR.write(0x7FF);    // clear interrupts
@@ -58,10 +86,7 @@ pub fn init() {
 /// Send a character
 pub fn send(c: u8) {
     // wait until we can send
-    while {
-        unsafe { asm!("nop" :::: "volatile"); }
-        UART0_FR.read() & 0x20 != 0
-    } {}
+    util::nop_while(|| UART0_FR.read() & 0x20 != 0);
     // write the character to the buffer
     UART0_DR.write(c);
 }
@@ -69,10 +94,7 @@ pub fn send(c: u8) {
 /// Receive a character
 pub fn receive() -> u8 {
     // wait until something is in the buffer
-    while {
-        unsafe { asm!("nop" :::: "volatile"); }
-        UART0_FR.read() & 0x10 != 0
-    } {}
+    util::nop_while(|| UART0_FR.read() & 0x10 != 0);
     // read it and return
     UART0_DR.read()
 }
