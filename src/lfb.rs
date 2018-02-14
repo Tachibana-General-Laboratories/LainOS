@@ -1,5 +1,6 @@
-use mbox;
-use core::ptr;
+use pi::mbox;
+use std::ptr::write_volatile;
+use std::mem::transmute;
 
 use volatile::prelude::*;
 
@@ -17,7 +18,7 @@ impl Lfb {
         for _ in 0..self.height {
             for _ in 0..self.width {
                 unsafe {
-                    ptr::write(p as *mut u32, rgba);
+                    write_volatile(p as *mut u32, rgba);
                     p = p.offset(4);
                 }
             }
@@ -117,26 +118,33 @@ pub struct Font {
     width: u32,
 }
 
-pub static FONT: &[u8] = include_bytes!("../font.psf");
+static FONT: &[u8] = include_bytes!("../font.psf");
+
+pub fn font() -> &'static Font {
+    unsafe {
+        transmute(FONT.as_ptr())
+    }
+}
 
 impl Font {
-    pub unsafe fn uprint(&self, fb: Lfb, mut x: isize, mut y: isize, s: &str, fg: u32, bg: u32) {
+    pub fn uprint(&self, fb: &Lfb, mut x: isize, mut y: isize, s: &str, fg: u32, bg: u32) {
         let bytesperline = (self.width+7)/8;
 
         // draw next character if it's not zero
         for c in s.chars() {
-            // get the offset of the glyph. Need to adjust this to support unicode table
-            let mut glyph: *const u8 = (self as *const Self as *const u8).offset(
+            // get the offset of the glyph.
+            // Need to adjust this to support unicode table
+            let mut glyph: *const u8 = unsafe {(self as *const Self as *const u8).offset(
                 (self.headersize as isize) +
                 (self.bytesperglyph as isize) *
                 (if (c as u32) < self.numglyph { c as isize } else { 0 })
-            );
+            )};
 
             // calculate the offset on screen
             let width = self.width as isize;
             let height = self.height as isize;
             let pitch = fb.pitch as isize;
-            let mut offs = y * height * pitch + x * (width) * 4;
+            let mut offs = y * height * pitch + x * width * 4;
 
             // handle carrige return
             if c == '\r' {
@@ -152,13 +160,15 @@ impl Font {
                     let mut mask = 1 << (self.width-1);
                     for _ in 0..self.width {
                         // if bit set, we use white color, otherwise black
+                        unsafe {
                         *(fb.lfb.offset(line) as *mut u32) =
-                            if ((*glyph) as u32) & mask != 0 { fg } else { bg };
+                            if *(glyph as *const u32) & mask != 0 { fg } else { bg };
+                        }
                         mask >>= 1;
                         line += 4;
                     }
                     // adjust to next line
-                    glyph = glyph.offset(bytesperline as isize);
+                    unsafe { glyph = glyph.offset(bytesperline as isize) };
                     offs += pitch;
                 }
 

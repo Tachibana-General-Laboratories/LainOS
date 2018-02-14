@@ -1,9 +1,8 @@
-use gpio::*;
+use super::IO_BASE;
 use util;
 
 use volatile::prelude::*;
 use volatile::{Volatile, Reserved};
-use core::ptr::{read_volatile, write_volatile};
 use core::ops::{Index, IndexMut};
 use core::mem::transmute;
 

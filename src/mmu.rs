@@ -1,5 +1,8 @@
 use gpio::*;
 use core::slice;
+use core::marker::PhantomData;
+use volatile::prelude::*;
+use volatile::Volatile;
 
 const PAGESIZE: isize = 4096;
 
@@ -13,7 +16,7 @@ const PT_USER: u64 =     1 << 6;      // unprivileged, EL0 access allowed
 const PT_RW: u64 =       0 << 7;      // read-write
 const PT_RO: u64 =       1 << 7;      // read-only
 const PT_AF: u64 =       1 << 10;     // accessed flag
-const PT_NX: u64 =       1 << 54;     // no execute
+const PT_XN: u64 =       1 << 54;     // no execute
 
 // shareability
 const PT_OSH: u64 =      2 << 8;      // outter shareable
@@ -26,90 +29,168 @@ const PT_NC: u64 =       2 << 2;      // non-cachable
 
 const TTBR_ENABLE: isize = 1;
 
+#[repr(usize)]
+enum Table {
+    LowL1 = 512 * 0,
+    HighL1 = 512 * 1,
+    LowL2 = 512 * 2,
+    LowL3 = 512 * 3,
+    HighL2 = 512 * 4,
+    HighL3 = 512 * 5,
+}
+
 // get addresses from linker
 extern "C" {
     static _data: *mut u8;
     static _end: *mut u8;
 }
 
+struct Table4<'a> {
+    paging: &'a mut [Volatile<u64>],
+}
+
+impl<'a> Table4<'a> {
+    fn write123dev(&mut self, virt: u64, phy: usize) {
+        //let l0 = (addr >> 39) & 512;
+        let l1 = (virt >> 30) & 0b111111111;
+        let l2 = (virt >> 21) & 0b111111111;
+        let l3 = (virt >> 12) & 0b111111111;
+
+        println!("[{} {} {}] p{:X} -> v{:X}", l1, l2, l3, phy, virt);
+
+        let l2_base = &self.paging[512 * 4] as *const Volatile<u64> as u64;
+        let l3_base = &self.paging[512 * 5] as *const Volatile<u64> as u64;
+
+        const F: u64 =
+            PT_PAGE |     // we have area in it mapped by pages
+            PT_AF |       // accessed flag
+            PT_KERNEL |   // privileged
+            PT_ISH |      // inner shareable
+            PT_MEM;       // normal memory
+
+        // TTBR1, kernel L1
+        self.paging[l1 as usize + Table::HighL1 as usize].write(l2_base | F);
+
+        // kernel L2
+        self.paging[l2 as usize + Table::HighL2 as usize].write(l3_base | F);
+
+        // kernel L3
+        self.paging[l3 as usize + Table::HighL3 as usize].write(
+            phy as u64 |  // physical address
+            PT_PAGE |     // map 4k
+            PT_AF |       // accessed flag
+            PT_XN |       // no execute
+            PT_KERNEL |   // privileged
+            PT_OSH |      // outter shareable
+            PT_DEV);      // device memory
+    }
+}
+
 /// Set up page translation tables and enable virtual memory
 pub unsafe fn init() {
-    let mut paging = slice::from_raw_parts_mut(_end as *mut u64, 512 * 16);
+    let mut paging = slice::from_raw_parts_mut(_end as *mut Volatile<u64>, 512 * 16);
 
     // create MMU translation tables at _end
 
     // TTBR0, identity L1
-    paging[0] = (_end.offset(2 * PAGESIZE) as u64) |    // physical address
+    paging[0].write((_end.offset(2 * PAGESIZE) as u64) |    // physical address
         PT_PAGE |     // it has the "Present" flag, which must be set, and we have area in it mapped by pages
         PT_AF |       // accessed flag. Without this we're going to have a Data Abort exception
         PT_USER |     // non-privileged
         PT_ISH |      // inner shareable
-        PT_MEM;       // normal memory
+        PT_MEM);      // normal memory
 
     // identity L2, first 2M block
-    paging[2 * 512]= (_end.offset(3 * PAGESIZE) as u64) | // physical address
+    paging[2 * 512].write((_end.offset(3 * PAGESIZE) as u64) | // physical address
         PT_PAGE |     // we have area in it mapped by pages
         PT_AF |       // accessed flag
         PT_USER |     // non-privileged
         PT_ISH |      // inner shareable
-        PT_MEM;       // normal memory
+        PT_MEM);      // normal memory
 
     // identity L2 2M blocks
     let b = IO_BASE >> 21;
 
     // skip 0th, as we're about to map it by L3
     for r in 1..512 {
-        paging[2 * 512 + r] = (r<<21) as u64 |  // physical address
+        paging[2 * 512 + r].write((r<<21) as u64 |  // physical address
             PT_BLOCK |    // map 2M block
             PT_AF |       // accessed flag
-            PT_NX |       // no execute
+            PT_XN |       // no execute
             PT_USER |     // non-privileged
             if r >= b {   // different attributes for device memory
                 PT_OSH | PT_DEV
             } else {
                 PT_ISH | PT_MEM
-            };
+            });
     }
 
     // identity L3
     for r in 0..512 {
-        paging[3 * 512 + r as usize] = ((r as u64) * PAGESIZE as u64) |   // physical address
+        paging[3 * 512 + r as usize].write((r * PAGESIZE as u64) |   // physical address
             PT_PAGE |     // map 4k
             PT_AF |       // accessed flag
-            PT_USER |     // non-privileged
+            PT_KERNEL |     // non-privileged
             PT_ISH |      // inner shareable
             // different for code and data
             if r < 0x80 || r > (_data as u64) / PAGESIZE as u64 {
-                PT_RW|PT_NX
+                PT_RW|PT_XN
             } else {
                 PT_RO
-            };
+            });
     }
 
+    {
+        let mut tbl = Table4 { paging };
+        let addr = IO_BASE + 0x00201000;
+        tbl.write123dev(addr as u64 | 0xFFFF_FF80_0000_0000, addr);
+    }
+
+    /*
+    // 508 1 0 as 0x3F02_00000
+    // 508 = 252 + 0xFF
+
     // TTBR1, kernel L1
-    paging[512+511] = _end.offset(4 * PAGESIZE) as u64 | // physical address
+    // 508 0 0 as 0x0000_0000
+    // 509 0 0 as 0x4000_0000
+    // 510 0 0 as 0x8000_0000
+    // 511 0 0 as 0xc000_0000
+    paging[512 /*+ 256 + 252*/].write(_end.offset(4 * PAGESIZE) as u64 | // physical address
         PT_PAGE |     // we have area in it mapped by pages
         PT_AF |       // accessed flag
         PT_KERNEL |   // privileged
         PT_ISH |      // inner shareable
-        PT_MEM;       // normal memory
+        PT_MEM);      // normal memory
 
     // kernel L2
-    paging[4 * 512 + 511]= _end.offset(5 * PAGESIZE) as u64 |   // physical address
+    // 511   0 0 as 0xc0000000
+    // 511 504 0 as 0xFF000000
+    // 511 505 0 as 0xFF200000
+    // 511 511 0 as 0xFFE00000
+    paging[4 * 512 + 505].write(_end.offset(5 * PAGESIZE) as u64 |   // physical address
         PT_PAGE |     // we have area in it mapped by pages
         PT_AF |       // accessed flag
         PT_KERNEL |   // privileged
         PT_ISH |      // inner shareable
-        PT_MEM;       // normal memory
+        PT_MEM);      // normal memory
 
     // kernel L3
-    paging[5 * 512] = (IO_BASE + 0x00201000) as u64 |   // physical address
+    paging[5 * 512 + 1].write((IO_BASE + 0x00201000) as u64 |   // physical address
         PT_PAGE |     // map 4k
         PT_AF |       // accessed flag
-        PT_NX |       // no execute
+        PT_XN |       // no execute
         PT_KERNEL |   // privileged
         PT_OSH |      // outter shareable
-        PT_DEV;       // device memory
+        PT_DEV);      // device memory
+
+    {
+        let addr = (IO_BASE + 0x00201000) as u64 | 0xFFFF_FFFF_0000_0000;
+        let l1 = (addr >> 30) & 0b111111111;
+        let l2 = (addr >> 21) & 0b111111111;
+        let l3 = (addr >> 12) & 0b111111111;
+        println!("{:X} {} {} {}", addr, l1, l2, l3);
+    }
+    */
 
     // okay, now we have to set system registers to enable MMU
 
@@ -146,7 +227,8 @@ pub unsafe fn init() {
         (0b0  <<  7) | // EPD0 enable lower half
         (25   <<  0);  // T0SZ=25, 3 levels (512G)
 
-    asm!("msr tcr_el1, $0;\n isb" : : "r" (r) : : "volatile");
+    asm!("msr tcr_el1, $0;
+         isb" : : "r" (r) : : "volatile");
 
     // tell the MMU where our translation tables are.
     // TTBR_ENABLE bit not documented, but required
@@ -156,12 +238,14 @@ pub unsafe fn init() {
         asm!("msr ttbr0_el1, $0" : : "r" (addr) : : "volatile");
         // upper half, kernel space
         let addr = _end.offset(TTBR_ENABLE + PAGESIZE) as u64;
-        asm!("msr ttbr1_el1, $0" : : "r" (addr));
+        asm!("msr ttbr1_el1, $0" : : "r" (addr) : : "volatile");
     }
 
     // finally, toggle some bits in system control register to enable page translation
     let mut r: u64;
-    asm!("dsb ish;\n isb;\n mrs $0, sctlr_el1" : "=r" (r) : : : "volatile");
+    asm!("dsb ish;
+         isb;
+         mrs $0, sctlr_el1" : "=r" (r) : : : "volatile");
 
     r |= 0xC00800;     // set mandatory reserved bits
 
@@ -176,5 +260,6 @@ pub unsafe fn init() {
 
     r |=   (1<<0);     // set M, enable MMU
 
-    asm!("msr sctlr_el1, $0;\n isb" : : "r" (r) : : "volatile");
+    asm!("msr sctlr_el1, $0;
+         isb" : : "r" (r) : : "volatile");
 }

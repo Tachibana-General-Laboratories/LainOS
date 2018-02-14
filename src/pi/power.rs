@@ -1,5 +1,5 @@
 use gpio::*;
-use mbox;
+use pi::mbox;
 use util;
 
 use volatile::prelude::*;

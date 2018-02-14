@@ -9,14 +9,14 @@ pub extern "C" fn exception_handler(kind: u64, esr: u64, elr: u64, spsr: u64, fa
         1 => print!("IRQ"),
         2 => print!("FIQ"),
         3 => print!("SError"),
-        _ => print!("unknown"),
+        v => print!("unknown [{}]", v),
     }
 
     print!(": ");
 
     // decode exception type (some, not all. See ARM DDI0487B_b chapter D10.2.28)
     match esr >> 26 {
-        0b000000 => print!("Unknown"),
+        0b000000 => print!("Unknown reason"),
         0b000001 => print!("Trapped WFI/WFE"),
         0b001110 => print!("Illegal execution"),
         0b010101 => print!("System call"),
@@ -27,7 +27,7 @@ pub extern "C" fn exception_handler(kind: u64, esr: u64, elr: u64, spsr: u64, fa
         0b100101 => print!("Data abort, same EL"),
         0b100110 => print!("Stack alignment fault"),
         0b101100 => print!("Floating point"),
-        _ => print!("Unknown"),
+        v => print!("Unknown 0b{:06b}", v),
     }
 
     // decode data abort cause

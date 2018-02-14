@@ -40,7 +40,6 @@ pub fn wait_msec(n: u32) {
 }
 
 pub fn dump(mut ptr: *const u8, size: usize) {
-    //println!("  DUMP    -----------------------  -----------------------  ------------------  ");
     let count = size / 16 + (size % 16 != 0) as usize;
     for _ in 0..count {
         unsafe {
@@ -62,5 +61,4 @@ pub fn dump(mut ptr: *const u8, size: usize) {
             ptr = ptr.offset(16);
         }
     }
-    //println!("  DUMP    ^^^^^^^^^^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^^^^^^^^^^                      ");
 }

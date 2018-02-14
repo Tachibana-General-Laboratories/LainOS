@@ -9,7 +9,11 @@
 #![no_builtins]
 
 #[macro_use]
+extern crate bitflags;
+
+#[macro_use]
 extern crate alloc;
+extern crate std;
 extern crate slab_allocator;
 extern crate spin;
 extern crate stack_vec;
@@ -27,10 +31,7 @@ pub mod mmu;
 
 pub mod gpio;
 pub mod pi;
-pub mod uart0;
-pub mod mbox;
 pub mod lfb;
-pub mod power;
 pub mod shell;
 //pub mod sd;
 
@@ -57,8 +58,8 @@ const ADDR_2GB: usize   = 0x8000_0000;
 
 pub fn init_heap() {
     // TODO why?
-    let heap_start = ADDR_128MB;
-    let heap_end = ADDR_256MB;
+    let heap_start = 0x0F00_0000;
+    let heap_end =   0x1000_0000;
     let heap_size = heap_end - heap_start;
     unsafe {
         ALLOCATOR.init(heap_start, heap_size);
@@ -70,7 +71,9 @@ pub fn init_heap() {
 pub extern "C" fn kernel_main() -> ! {
     init_heap();
 
-    uart0::init();
+    unsafe {
+        pi::uart0::init();
+    }
 
     println!("      .  ");
     println!("    < 0 >");
@@ -83,14 +86,23 @@ pub extern "C" fn kernel_main() -> ! {
 
     util::dump(s.as_str().as_ptr(), s.len());
 
-    if false {
+    if true {
         unsafe {
             mmu::init();
+        }
 
+            /*
             // generate a Data Abort with a bad address access
             let mut r = gpio::Mmio::new(0xFFFF_FFFF_FF00_0000);
             r.write(1u32);
-            println!("bad {}", r.read());
+            */
+
+        const KERNEL_UART0: usize = 0xFFFFFF80_3F201000;
+
+        let s = format!("fuck {:016X}\n", KERNEL_UART0);
+        let mut uart = unsafe { pi::uart0::Uart0::from_addr(KERNEL_UART0) };
+        for c in s.chars() {
+            uart.send(c as u8);
         }
     }
 
@@ -130,18 +142,14 @@ pub extern "C" fn kernel_main() -> ! {
         rgb: false,
     };
 
-    if let Some(lfb) = lfb::init(info) {
-        lfb.fill_rgba(0xFF0000);
-        unsafe {
-            use core::mem::transmute;
-            let font = transmute::<*const u8, &'static lfb::Font>(lfb::FONT.as_ptr());
-            font.uprint(lfb, 10, 5, "Prepare uranus!", 0x00FF00, 0x0000FF);
+    match lfb::init(info) {
+        Some(lfb) =>  {
+            lfb.fill_rgba(0xFF0000);
+            lfb::font().uprint(&lfb, 10, 5, "Prepare uranus!", 0x00FF00, 0x0000FF);
+            lfb::font().uprint(&lfb, 10, 6, "Prepare uranus!", 0xFF0000, 0x0000FF);
         }
-    } else {
-        println!("Unable to set screen resolution to 1024x768x32");
+        None => println!("Unable to set screen resolution to 1024x768x32"),
     }
 
-    println!("you have no choice");
-
-    shell::shell("> ");
+    shell::shell("> ")
 }

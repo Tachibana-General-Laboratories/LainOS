@@ -1,9 +1,9 @@
 use stack_vec::StackVec;
 use core::str::from_utf8;
 
-use uart0;
+use pi::uart0;
+use pi::power;
 use util;
-use power;
 
 /// Error type for `Command` parse failures.
 #[derive(Debug)]
@@ -119,23 +119,32 @@ fn echo<'a>(args: StackVec<'a, &'a str>) {
 }
 
 fn ls<'a>(args: StackVec<'a, &'a str>) {
-    println!("  no file system yet;   but... maybe {} is:", args[1]);
-    match args[1] {
+    let dir = if args.len() > 1 {
+        args[1]
+    } else {
+        ""
+    };
+    println!("  no file system yet;   but... maybe {} is:", dir);
+    match dir {
         "/" => print!("bin etc sys usr var"),
-        _ => print!("ls: cannot access '{}': No such file or directory", args[1]),
+        _ => print!("ls: cannot access '{}': No such file or directory", dir),
     }
 }
 
 
 fn dump<'a>(args: StackVec<'a, &'a str>) {
-    if args.len() != 3 {
+    if args.len() < 2 {
         println!("usage:");
         print!  ("    dump <hex addr> <size=512>");
         return;
     }
 
-    let size = usize::from_str_radix(args[2], 10).unwrap_or(0);
-    let addr = usize::from_str_radix(args[1], 16).unwrap_or(512);
+    let addr = usize::from_str_radix(args[1], 16).unwrap_or(0x80_0000);
+    let size = if args.len() > 2 {
+        usize::from_str_radix(args[2], 10).unwrap_or(256)
+    } else {
+        256
+    };
 
-    util::dump(unsafe { addr as *mut u8 }, size);
+    util::dump(unsafe { addr as *const u8 }, size);
 }
