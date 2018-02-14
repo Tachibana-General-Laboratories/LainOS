@@ -11,10 +11,12 @@ members = [
 [dependencies]
 spin = "*"
 slab_allocator = "0.3.0"
+bitflags = "1.0"
 #pi = { path = "../pi", features = ["std"] }
 
 stack-vec = { path = "stack-vec" }
 volatile = { path = "volatile" }
+std = { path = "std" }
 
 [lib]
 crate-type = ["staticlib"]

@@ -29,8 +29,8 @@ VPATH = ext
 all: $(KERNEL).img
 
 qemu: all
-	#qemu-system-aarch64 -M raspi3 -serial mon:stdio -kernel $(KERNEL).img   #-d in_asm
-	qemu-system-aarch64 -M raspi3 -kernel $(KERNEL).img   #-d in_asm
+	qemu-system-aarch64 -M raspi3 -serial stdio -kernel $(KERNEL).img   #-d in_asm
+	#qemu-system-aarch64 -M raspi3 -kernel $(KERNEL).img   #-d in_asm
 
 clean:
 	$(XARGO) clean

@@ -52,15 +52,12 @@ _start:
     // set up exception handlers
     ldr     x2, =_vectors
     msr     vbar_el1, x2
-
-    /*
     // change execution level to EL1
     mov     x2, #0x3c4
     msr     spsr_el2, x2
     adr     x2, 5f
     msr     elr_el2, x2
     eret
-    */
 
 5:  mov     sp, x1
 
