@@ -1,6 +1,5 @@
-use core::fmt;
-
-use core::intrinsics::abort;
+use std::fmt;
+use std::intrinsics::abort;
 
 #[lang = "eh_personality"]
 pub extern "C" fn eh_personality() {}

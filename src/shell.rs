@@ -1,5 +1,5 @@
 use stack_vec::StackVec;
-use core::str::from_utf8;
+use std::str::from_utf8;
 
 use pi::uart0;
 use pi::power;

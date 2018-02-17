@@ -5,39 +5,49 @@
 #![feature(global_allocator)]
 #![feature(decl_macro)]
 
-#![no_std]
-#![no_builtins]
-
 #[macro_use]
 extern crate bitflags;
 
 #[macro_use]
 extern crate alloc;
-extern crate std;
 extern crate slab_allocator;
 extern crate spin;
 extern crate stack_vec;
 extern crate volatile;
 
 #[macro_use]
+#[cfg(not(test))]
 pub mod print;
 pub mod externs;
+#[cfg(not(test))]
 pub mod panic;
 
+#[cfg(not(test))]
 pub mod util;
 
+#[cfg(not(test))]
 pub mod exception;
+#[cfg(not(test))]
 pub mod mmu;
 
+#[cfg(not(test))]
 pub mod gpio;
+#[cfg(not(test))]
 pub mod pi;
-pub mod lfb;
+#[cfg(not(test))]
+pub mod fb;
+#[cfg(not(test))]
 pub mod shell;
 //pub mod sd;
+pub mod sdn;
+
+
+pub mod allocator;
 
 use slab_allocator::LockedHeap;
 use alloc::*;
 
+#[cfg(not(test))]
 #[global_allocator]
 static mut ALLOCATOR: LockedHeap = LockedHeap::empty();
 
@@ -56,6 +66,7 @@ const ADDR_512MB: usize = 0x2000_0000;
 const ADDR_1GB: usize   = 0x4000_0000;
 const ADDR_2GB: usize   = 0x8000_0000;
 
+#[cfg(not(test))]
 pub fn init_heap() {
     // TODO why?
     let heap_start = 0x0F00_0000;
@@ -68,6 +79,7 @@ pub fn init_heap() {
 
 #[no_mangle]
 #[inline(never)]
+#[cfg(not(test))]
 pub extern "C" fn kernel_main() -> ! {
     init_heap();
 
@@ -80,11 +92,30 @@ pub extern "C" fn kernel_main() -> ! {
     println!("    ./ \\.");
     println!("");
 
-    let s = String::from("fucking string!");
+    let mut s = String::from("fucking string!");
 
     println!("Hello Rust Kernel world! 0x{:X} {}", 0xDEAD, s);
 
-    util::dump(s.as_str().as_ptr(), s.len());
+    unsafe {
+        // initialize EMMC and detect SD card type
+        if sdn::sd_init() == 0  {
+            // read the master boot record after our bss segment
+            let p = 0x00F0_0000 as *mut u8;
+            let len = sdn::sd_readblock(0, p, 1) as usize;
+            if len != 0 {
+                // dump it to serial console
+                util::dump(p, len);
+            }
+
+            let p = p.offset(len as isize);
+            let len = sdn::sd_readblock(1, p, 1) as usize;
+            if len != 0 {
+                // dump it to serial console
+                util::dump(p, len);
+            }
+        }
+    }
+
 
     if true {
         unsafe {
@@ -131,7 +162,7 @@ pub extern "C" fn kernel_main() -> ! {
         }
     }
 
-    let info = lfb::FrameBufferInfo {
+    let info = fb::FrameBufferInfo {
         width: 360,
         height: 640,
         virtual_width: 360,
@@ -142,11 +173,17 @@ pub extern "C" fn kernel_main() -> ! {
         rgb: false,
     };
 
-    match lfb::init(info) {
-        Some(lfb) =>  {
-            lfb.fill_rgba(0xFF0000);
-            lfb::font().uprint(&lfb, 10, 5, "Prepare uranus!", 0x00FF00, 0x0000FF);
-            lfb::font().uprint(&lfb, 10, 6, "Prepare uranus!", 0xFF0000, 0x0000FF);
+    match fb::init(info) {
+        Some(fb) =>  {
+            fb.fill_rgba(0xFF0000);
+            fb::font().uprint(&fb, 15, 5, "Prepare uranus!", 0x00FF00, 0x0000FF);
+            fb::font().uprint(&fb, 15, 6, "Prepare uranus!", 0xFF0000, 0x0000FF);
+            fb::font().uprint(&fb, 13, 8, "< Prepare uranus! >", 0xFF0000, 0x000000);
+
+            fb::font().uprint(&fb, 20, 10, "  .  ",  0x000000, 0xFF0000);
+            fb::font().uprint(&fb, 20, 11, "< 0 >",  0x000000, 0xFF0000);
+            fb::font().uprint(&fb, 20, 12, "./ \\.", 0x000000, 0xFF0000);
+
         }
         None => println!("Unable to set screen resolution to 1024x768x32"),
     }

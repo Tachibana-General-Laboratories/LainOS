@@ -22,15 +22,19 @@ EXT_DEPS := build/start.o
 
 KERNEL := $(BUILD_DIR)/$(RUST_BINARY)
 
-.PHONY: all qemu clean check
+.PHONY: all qemu clean check test
 
 VPATH = ext
 
 all: $(KERNEL).img
 
 qemu: all
-	qemu-system-aarch64 -M raspi3 -serial stdio -kernel $(KERNEL).img   #-d in_asm
+	#qemu-system-aarch64 -M raspi3 -serial stdio -kernel $(KERNEL).img   #-d in_asm
+	qemu-system-aarch64 -M raspi3 -drive file=raspi3-lainos.json,if=sd,format=raw -serial stdio -kernel $(KERNEL).img
 	#qemu-system-aarch64 -M raspi3 -kernel $(KERNEL).img   #-d in_asm
+
+test:
+	cargo test
 
 clean:
 	$(XARGO) clean

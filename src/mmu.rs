@@ -1,6 +1,6 @@
 use gpio::*;
-use core::slice;
-use core::marker::PhantomData;
+use std::slice;
+use std::marker::PhantomData;
 use volatile::prelude::*;
 use volatile::Volatile;
 

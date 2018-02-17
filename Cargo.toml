@@ -30,8 +30,6 @@ debug = true
 opt-level = 1
 
 [profile.test]
-panic = "abort"
-lto = true
 debug = true
 
 [profile.release]

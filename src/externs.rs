@@ -1,4 +1,4 @@
-use core::ptr;
+use std::ptr;
 
 #[no_mangle]
 pub unsafe extern fn memcpy(dest: *mut u8, src: *const u8,

@@ -1,5 +1,5 @@
-use core::intrinsics::{volatile_load, volatile_store};
-use core::marker::PhantomData;
+use std::intrinsics::{volatile_load, volatile_store};
+use std::marker::PhantomData;
 
 pub use pi::IO_BASE;
 

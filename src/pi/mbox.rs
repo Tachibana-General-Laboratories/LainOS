@@ -3,8 +3,8 @@ use util;
 
 use volatile::prelude::*;
 use volatile::{Volatile, Reserved};
-use core::ops::{Index, IndexMut};
-use core::mem::transmute;
+use std::ops::{Index, IndexMut};
+use std::mem::transmute;
 
 #[repr(align(16))]
 /// a properly aligned buffer

@@ -2,22 +2,20 @@ use super::*;
 use gpio::*;
 use util;
 
+use super::gpio;
+
 use std::io;
 
 use volatile::prelude::*;
 use volatile::{ReadVolatile, Volatile, Reserved};
 
-/*
-use gpio::MMIO_BASE as IO_BASE;
-
-
 #[repr(C)]
 #[allow(non_snake_case)]
 struct Registers {
-    DR: Volatile<u32>,          // Data register
-    RSRECR: [Reserved<u32>, 5],
+    DR: Volatile<u8>,
+    RSRECR: [Reserved<u32>; 5],
+    FR: ReadVolatile<u8>,
 
-    FR: Volatile<u32>,          // Flag register
     ILPR: Reserved<u32>,
     IBRD: Volatile<u32>,        // Integer Baud rate divisor
     FBRD: Volatile<u32>,        // Fractional Baud rate divisor
@@ -34,21 +32,10 @@ struct Registers {
     ITOP: Reserved<u32>,        // Integration test output reg
     TDR: Reserved<u32>,         // Test Data reg
 }
-*/
 
-#[repr(C)]
-#[allow(non_snake_case)]
-struct Registers {
-    DR: Volatile<u8>,
-    RSRECR: [Reserved<u32>; 5],
-    FR: ReadVolatile<u8>,
-}
-
-const PL011_UART: usize = IO_BASE+0x00201000;
+const PL011_UART: usize = IO_BASE + 0x201000;
 
 // PL011 UART registers
-//pub const UART0_DR: Vola<u8> =        Mmio::new(IO_BASE+0x00201000);
-//pub const UART0_FR: Mmio<u8> =        Mmio::new(IO_BASE+0x00201018);
 
 const UART0_IBRD: *mut Volatile<u32> = (PL011_UART + 0x24) as *mut Volatile<u32>;
 const UART0_FBRD: *mut Volatile<u32> = (PL011_UART + 0x28) as *mut Volatile<u32>;
@@ -75,16 +62,16 @@ pub unsafe fn init() {
     b.call(mbox::Channel::PROP1).unwrap();
 
     // map UART0 to GPIO pins
-    let mut r = GPFSEL1.read();
+    let mut r = (*GP).FSEL[1].read();
     r &= !(7<<12 | 7<<15); // gpio14, gpio15
     r |= 4<<12 | 4<<15;    // alt0
-    GPFSEL1.write(r);
+    (*GP).FSEL[1].write(r);
 
-    GPPUD.write(0);            // enable pins 14 and 15
+    (*GP).PUD.write(0);            // enable pins 14 and 15
     util::wait_cycles(150);
-    GPPUDCLK0.write(1<<14 | 1<<15);
+    (*GP).PUDCLK[0].write(1<<14 | 1<<15);
     util::wait_cycles(150);
-    GPPUDCLK0.write(0);        // flush GPIO setup
+    (*GP).PUDCLK[0].write(0);        // flush GPIO setup
 
     (*UART0_ICR).write(0x7FF);    // clear interrupts
     (*UART0_IBRD).write(2);       // 115200 baud

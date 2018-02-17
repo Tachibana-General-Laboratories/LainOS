@@ -4,25 +4,25 @@ use std::mem::transmute;
 
 use volatile::prelude::*;
 
-pub struct Lfb {
+pub struct FrameBuffer {
     lfb: *mut u8,
     width: u32,
     height: u32,
     pitch: u32,
 }
 
-impl Lfb {
+impl FrameBuffer {
     pub fn fill_rgba(&self, rgba: u32) {
         let mut p = self.lfb;
-        let stride = self.pitch as isize - self.width as isize * 4;
+        let stride = self.pitch as usize - self.width as usize * 4;
         for _ in 0..self.height {
             for _ in 0..self.width {
                 unsafe {
                     write_volatile(p as *mut u32, rgba);
-                    p = p.offset(4);
+                    p = p.add(4);
                 }
             }
-            unsafe { p = p.offset(stride); }
+            unsafe { p = p.add(stride); }
         }
     }
 }
@@ -38,7 +38,7 @@ pub struct FrameBufferInfo {
     pub rgb: bool,
 }
 
-pub fn init(info: FrameBufferInfo) -> Option<Lfb> {
+pub fn init(info: FrameBufferInfo) -> Option<FrameBuffer> {
     let mut b = mbox::Mailbox::new();
 
     b[ 0].write(35*4);
@@ -94,7 +94,7 @@ pub fn init(info: FrameBufferInfo) -> Option<Lfb> {
         let w = b[28].read() & 0x3FFFFFFF;
         b[28].write(w);
 
-        Some(Lfb {
+        Some(FrameBuffer {
             width: b[5].read(),
             height: b[6].read(),
             pitch: b[33].read(),
@@ -127,7 +127,7 @@ pub fn font() -> &'static Font {
 }
 
 impl Font {
-    pub fn uprint(&self, fb: &Lfb, mut x: isize, mut y: isize, s: &str, fg: u32, bg: u32) {
+    pub fn uprint(&self, fb: &FrameBuffer, mut x: isize, mut y: isize, s: &str, fg: u32, bg: u32) {
         let bytesperline = (self.width+7)/8;
 
         // draw next character if it's not zero

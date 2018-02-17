@@ -1,4 +1,4 @@
-use core::marker::PhantomData;
+use std::marker::PhantomData;
 
 use super::{IO_BASE, states};
 use volatile::prelude::*;
@@ -19,31 +19,31 @@ pub enum Function {
 
 #[repr(C)]
 #[allow(non_snake_case)]
-struct Registers {
-    FSEL: [Volatile<u32>; 6],
+pub struct Registers {
+    pub FSEL: [Volatile<u32>; 6],
     __r0: Reserved<u32>,
-    SET: [WriteVolatile<u32>; 2],
+    pub SET: [WriteVolatile<u32>; 2],
     __r1: Reserved<u32>,
-    CLR: [WriteVolatile<u32>; 2],
+    pub CLR: [WriteVolatile<u32>; 2],
     __r2: Reserved<u32>,
-    LEV: [ReadVolatile<u32>; 2],
+    pub LEV: [ReadVolatile<u32>; 2],
     __r3: Reserved<u32>,
-    EDS: [Volatile<u32>; 2],
+    pub EDS: [Volatile<u32>; 2],
     __r4: Reserved<u32>,
-    REN: [Volatile<u32>; 2],
+    pub REN: [Volatile<u32>; 2],
     __r5: Reserved<u32>,
-    FEN: [Volatile<u32>; 2],
+    pub FEN: [Volatile<u32>; 2],
     __r6: Reserved<u32>,
-    HEN: [Volatile<u32>; 2],
+    pub HEN: [Volatile<u32>; 2],
     __r7: Reserved<u32>,
-    LEN: [Volatile<u32>; 2],
+    pub LEN: [Volatile<u32>; 2],
     __r8: Reserved<u32>,
-    AREN: [Volatile<u32>; 2],
+    pub AREN: [Volatile<u32>; 2],
     __r9: Reserved<u32>,
-    AFEN: [Volatile<u32>; 2],
+    pub AFEN: [Volatile<u32>; 2],
     __r10: Reserved<u32>,
-    PUD: Volatile<u32>,
-    PUDCLK: [Volatile<u32>; 2],
+    pub PUD: Volatile<u32>,
+    pub PUDCLK: [Volatile<u32>; 2],
 }
 
 /// Possible states for a GPIO pin.
@@ -65,7 +65,7 @@ pub struct Gpio<State> {
 }
 
 /// The base address of the `GPIO` registers.
-const GPIO_BASE: usize = IO_BASE + 0x200000;
+pub const GPIO_BASE: usize = IO_BASE + 0x200000;
 
 impl<T> Gpio<T> {
     /// Transitions `self` to state `S`, consuming `self` and returning a new
