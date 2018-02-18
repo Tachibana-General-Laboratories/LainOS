@@ -3,9 +3,8 @@ use std::fmt;
 use volatile::prelude::*;
 use volatile::{Volatile, ReadVolatile, Reserved};
 
-use timer;
-use common::IO_BASE;
-use gpio::{Gpio, Function};
+use super::{timer, IO_BASE};
+use super::gpio::{Gpio, Function};
 
 /// The base address for the `MU` registers.
 const MU_REG_BASE: usize = IO_BASE + 0x215040;

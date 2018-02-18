@@ -6,11 +6,8 @@ pub macro states($($name:ident),*) {
     $(pub enum $name {  })*
 }
 
-
 pub mod gpio;
 pub mod timer;
 pub mod mbox;
 pub mod power;
 pub mod uart0;
-
-//static mut GP: *mut gpio::Registers = gpio::GPIO_BASE as *mut gpio::Registers;

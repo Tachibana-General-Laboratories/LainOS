@@ -18,6 +18,9 @@ extern crate volatile;
 #[macro_use]
 #[cfg(not(test))]
 pub mod print;
+
+//#[cfg(not(test))]
+//pub mod console;
 pub mod externs;
 #[cfg(not(test))]
 pub mod panic;
@@ -81,9 +84,7 @@ pub fn init_heap() {
 pub extern "C" fn kernel_main() -> ! {
     init_heap();
 
-    unsafe {
-        pi::uart0::Uart0::new().init();
-    }
+    pi::uart0::Uart0::new().initialize();
 
     println!("      .  ");
     println!("    < 0 >");

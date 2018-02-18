@@ -85,6 +85,7 @@ _vectors:
     mrs     x3, spsr_el1
     mrs     x4, far_el1
     b       exception_handler
+    eret
 
     // IRQ
     .align  7
@@ -94,6 +95,7 @@ _vectors:
     mrs     x3, spsr_el1
     mrs     x4, far_el1
     b       exception_handler
+    eret
 
     // FIQ
     .align  7
@@ -103,6 +105,7 @@ _vectors:
     mrs     x3, spsr_el1
     mrs     x4, far_el1
     b       exception_handler
+    eret
 
     // SError
     .align  7
@@ -112,3 +115,4 @@ _vectors:
     mrs     x3, spsr_el1
     mrs     x4, far_el1
     b       exception_handler
+    eret

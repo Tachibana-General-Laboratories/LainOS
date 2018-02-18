@@ -3,6 +3,7 @@ use std::marker::PhantomData;
 use super::{IO_BASE, states};
 use volatile::prelude::*;
 use volatile::{Volatile, WriteVolatile, ReadVolatile, Reserved};
+use util::wait_cycles;
 
 /// An alternative GPIO function.
 #[repr(u8)]
@@ -101,8 +102,8 @@ impl Gpio<Uninitialized> {
     /// Enables the alternative function `function` for `self`. Consumes self
     /// and returns a `Gpio` structure in the `Alt` state.
     pub fn into_alt(self, function: Function) -> Gpio<Alt> {
-        let index = (self.pin % 10) as usize;
-        let shift = ((self.pin / 10) * 3) as u32;
+        let index = (self.pin / 10) as usize;
+        let shift = ((self.pin % 10) * 3) as u32;
         let value = (function as u32) << shift;
         let mask = !(0b111 << shift);
         let data = self.registers.FSEL[index].read();
@@ -150,26 +151,23 @@ impl Gpio<Input> {
     }
 }
 
+#[repr(u32)]
+pub enum Pull {
+    Off = 0b00,
+    Down = 0b01,
+    Up = 0b10,
+}
+
 impl Gpio<Alt> {
-    pub fn disable_pull(&mut self) {
-        self.registers.PUD.write(0b00)
-    }
-    pub fn pulldown(&mut self) {
-        self.registers.PUD.write(0b01)
-    }
-    pub fn pullup(&mut self) {
-        self.registers.PUD.write(0b10)
-    }
-
-    pub fn pudclk_set(&mut self) {
+    pub fn pull(&mut self, value: Pull) {
         let index = (self.pin / 32) as usize;
         let shift = (self.pin % 32) as u32;
+
+        self.registers.PUD.write(value as u32);
+        wait_cycles(150);
         self.registers.PUDCLK[index].and_mask(1 << shift);
-    }
-
-    pub fn pudclk_clear(&mut self) {
-        let index = (self.pin / 32) as usize;
-        let shift = (self.pin % 32) as u32;
-        self.registers.PUDCLK[index].and_mask(!(1 << shift));
+        wait_cycles(150);
+        self.registers.PUD.write(0);
+        self.registers.PUDCLK[index].and_mask(0);
     }
 }

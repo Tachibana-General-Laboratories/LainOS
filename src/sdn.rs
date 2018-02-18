@@ -1,6 +1,15 @@
+#![allow(unused_mut)]
+#![allow(non_camel_case_types)]
+#![allow(non_snake_case)]
+#![allow(dead_code)]
+#![allow(non_upper_case_globals)]
+#![allow(unused_parens)]
+#![allow(unused_assignments)]
+
 use util::wait_msec;
 use util::wait_cycles;
 
+use pi::gpio;
 use pi::IO_BASE;
 use volatile::prelude::*;
 use volatile::{Volatile, Reserved};
@@ -158,21 +167,13 @@ const HOST_SPEC_V2: c_long = 1;
 const C1_CLK_STABLE: c_uint = 2;
 
 // GPIO_CD
-const GPFSEL4: *mut c_uint = (1056964608 + 2097168) as *mut c_uint;
-const GPPUD: *mut c_uint = (1056964608 + 2097300) as *mut c_uint;
-const GPPUDCLK1: *mut c_uint = (1056964608 + 2097308) as *mut c_uint;
 const GPHEN1: *mut c_uint = (1056964608 + 2097256) as *mut c_uint;
-// GPIO_CLK, GPIO_CMD
-// GPIO_DAT0, GPIO_DAT1, GPIO_DAT2, GPIO_DAT3
-const GPFSEL5: *mut c_uint = (1056964608 + 2097172) as *mut c_uint;
+
 const HOST_SPEC_NUM: c_uint = 16711680;
 const HOST_SPEC_NUM_SHIFT: c_int = 16;
-//const EMMC_CONTROL0: *mut c_uint =   (1056964608 + 3145768) as *mut c_uint;
 const C1_SRST_HC: c_uint = 16777216;
 const C1_CLK_INTLEN: c_int = 1;
 const C1_TOUNIT_MAX: c_int = 917504;
-//const EMMC_INT_EN: *mut c_uint =  (1056964608 + 3145784) as *mut c_uint;
-//const EMMC_INT_MASK: *mut u32 = (1056964608 + 3145780) as *mut u32;
 const ACMD41_CMD_COMPLETE: c_long = 2147483648;
 const ACMD41_ARG_HC: c_uint = 1375698944;
 const ACMD41_VOLTAGE: c_long = 16744448;
@@ -393,42 +394,23 @@ pub unsafe fn sd_clk(mut f: c_uint) -> c_int {
 /// initialize EMMC to read SDHC card
 pub unsafe fn sd_init() -> c_int {
     let mut ccs = 0; // add software flag
-    let mut r = *GPFSEL4 as u64;
-    r &= !(7 << (7 * 3));
-    *GPFSEL4 = r as u32;
-    *GPPUD = 2;
-    wait_cycles(150);
-    *GPPUDCLK1 = (1 << 15);
-    wait_cycles(150);
-    *GPPUD = 0;
-    *GPPUDCLK1 = 0;
-    r = *GPHEN1 as u64;
-    r |= 1 << 15;
-    *GPHEN1 = r as u32;
-    r = *GPFSEL4 as u64;
-    r |= (7 << (8 * 3)) | (7 << (9 * 3));
-    *GPFSEL4 = r as u32;
-    *GPPUD = 2;
-    wait_cycles(150);
-    *GPPUDCLK1 = (1 << 16) | (1 << 17);
-    wait_cycles(150);
-    *GPPUD = 0;
-    *GPPUDCLK1 = 0;
-    r = *GPFSEL5 as u64;
-    r |= (7 << (0 * 3)) | (7 << (1 * 3)) | (7 << (2 * 3)) | (7 << (3 * 3));
-    *GPFSEL5 = r as u32;
-    *GPPUD = 2;
-    wait_cycles(150);
-    *GPPUDCLK1 = (1 << 18) | (1 << 19) | (1 << 20) | (1 << 21);
-    wait_cycles(150);
-    *GPPUD = 0;
-    *GPPUDCLK1 = 0;
+
+    {
+        for &pin in &[47, 48, 49, 50, 51, 52, 53] {
+            let mut pin = gpio::Gpio::new(pin).into_alt(gpio::Function::Alt3);
+            pin.pull(gpio::Pull::Up)
+        }
+        *GPHEN1 = *GPHEN1 | (1 << 15);
+    }
+
+    let mut r: u64;
+
     sd_hv = (((*EMMC).SLOTISR_VER.read() & HOST_SPEC_NUM) >> HOST_SPEC_NUM_SHIFT) as u64;
     println!("EMMC: GPIO set up");
     (*EMMC).CONTROL0.write(0);
     (*EMMC).CONTROL1.or_mask(C1_SRST_HC);
     let mut cnt = 10000;
-    loop  {
+    loop {
         wait_msec(10);
         if !(((*EMMC).CONTROL1.read() & C1_SRST_HC) != 0 &&
                  { let t = cnt; cnt -= 1; t } != 0) {
@@ -514,50 +496,48 @@ pub unsafe fn sd_init() -> c_int {
 
 
 
-/*
-#define IX_GO_IDLE_STATE    0
-#define IX_ALL_SEND_CID     1
-#define IX_SEND_REL_ADDR    2
-#define IX_SET_DSR          3
-#define IX_SWITCH_FUNC      4
-#define IX_CARD_SELECT      5
-#define IX_SEND_IF_COND     6
-#define IX_SEND_CSD         7
-#define IX_SEND_CID         8
-#define IX_VOLTAGE_SWITCH   9
-#define IX_STOP_TRANS       10
-#define IX_SEND_STATUS      11
-#define IX_GO_INACTIVE      12
-#define IX_SET_BLOCKLEN     13
-#define IX_READ_SINGLE      14
-#define IX_READ_MULTI       15
-#define IX_SEND_TUNING      16
-#define IX_SPEED_CLASS      17
-#define IX_SET_BLOCKCNT     18
-#define IX_WRITE_SINGLE     19
-#define IX_WRITE_MULTI      20
-#define IX_PROGRAM_CSD      21
-#define IX_SET_WRITE_PR     22
-#define IX_CLR_WRITE_PR     23
-#define IX_SND_WRITE_PR     24
-#define IX_ERASE_WR_ST      25
-#define IX_ERASE_WR_END     26
-#define IX_ERASE            27
-#define IX_LOCK_UNLOCK      28
-#define IX_APP_CMD          29
-#define IX_APP_CMD_RCA      30
-#define IX_GEN_CMD          31
+const IX_GO_IDLE_STATE: usize =     0;
+const IX_ALL_SEND_CID: usize =      1;
+const IX_SEND_REL_ADDR: usize =     2;
+const IX_SET_DSR: usize =           3;
+const IX_SWITCH_FUNC: usize =       4;
+const IX_CARD_SELECT: usize =       5;
+const IX_SEND_IF_COND: usize =      6;
+const IX_SEND_CSD: usize =          7;
+const IX_SEND_CID: usize =          8;
+const IX_VOLTAGE_SWITCH: usize =    9;
+const IX_STOP_TRANS: usize =       10;
+const IX_SEND_STATUS: usize =      11;
+const IX_GO_INACTIVE: usize =      12;
+const IX_SET_BLOCKLEN: usize =     13;
+const IX_READ_SINGLE: usize =      14;
+const IX_READ_MULTI: usize =       15;
+const IX_SEND_TUNING: usize =      16;
+const IX_SPEED_CLASS: usize =      17;
+const IX_SET_BLOCKCNT: usize =     18;
+const IX_WRITE_SINGLE: usize =     19;
+const IX_WRITE_MULTI: usize =      20;
+const IX_PROGRAM_CSD: usize =      21;
+const IX_SET_WRITE_PR: usize =     22;
+const IX_CLR_WRITE_PR: usize =     23;
+const IX_SND_WRITE_PR: usize =     24;
+const IX_ERASE_WR_ST: usize =      25;
+const IX_ERASE_WR_END: usize =     26;
+const IX_ERASE: usize =            27;
+const IX_LOCK_UNLOCK: usize =      28;
+const IX_APP_CMD: usize =          29;
+const IX_APP_CMD_RCA: usize =      30;
+const IX_GEN_CMD: usize =          31;
 
 // Commands hereafter require APP_CMD.
-#define IX_APP_CMD_START    32
-#define IX_SET_BUS_WIDTH    32
-#define IX_SD_STATUS        33
-#define IX_SEND_NUM_WRBL    34
-#define IX_SEND_NUM_ERS     35
-#define IX_APP_SEND_OP_COND 36
-#define IX_SET_CLR_DET      37
-#define IX_SEND_SCR         38
-*/
+const IX_APP_CMD_START: usize =    32;
+const IX_SET_BUS_WIDTH: usize =    32;
+const IX_SD_STATUS: usize =        33;
+const IX_SEND_NUM_WRBL: usize =    34;
+const IX_SEND_NUM_ERS: usize =     35;
+const IX_APP_SEND_OP_COND: usize = 36;
+const IX_SET_CLR_DET: usize =      37;
+const IX_SEND_SCR: usize =         38;
 
 
 struct EMMCCommand {
