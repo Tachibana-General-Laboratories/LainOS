@@ -1,4 +1,4 @@
-use gpio::*;
+use pi::*;
 use std::slice;
 use std::marker::PhantomData;
 use volatile::prelude::*;

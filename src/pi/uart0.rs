@@ -1,5 +1,5 @@
 use super::*;
-use gpio::*;
+use super::gpio::*;
 use util;
 
 use super::gpio;
@@ -44,41 +44,6 @@ const UART0_CR: *mut Volatile<u32> =   (PL011_UART + 0x30) as *mut Volatile<u32>
 const UART0_IMSC: *mut Volatile<u32> = (PL011_UART + 0x38) as *mut Volatile<u32>;
 const UART0_ICR: *mut Volatile<u32> =  (PL011_UART + 0x44) as *mut Volatile<u32>;
 
-/// Set baud rate and characteristics (115200 8N1) and map to GPIO
-pub unsafe fn init() {
-    // initialize UART
-    (*UART0_CR).write(0);         // turn off UART0
-
-    // set up clock for consistent divisor values
-    let mut b = mbox::Mailbox::new();
-    b[0].write(8 * 4);
-    b[1].write(mbox::REQUEST);
-    b[2].write(mbox::TAG_SETCLKRATE); // set clock rate
-    b[3].write(12);
-    b[4].write(8);
-    b[5].write(2);           // UART clock
-    b[6].write(4000000);     // 4Mhz
-    b[7].write(mbox::TAG_LAST);
-    b.call(mbox::Channel::PROP1).unwrap();
-
-    // map UART0 to GPIO pins
-    let mut r = (*GP).FSEL[1].read();
-    r &= !(7<<12 | 7<<15); // gpio14, gpio15
-    r |= 4<<12 | 4<<15;    // alt0
-    (*GP).FSEL[1].write(r);
-
-    (*GP).PUD.write(0);            // enable pins 14 and 15
-    util::wait_cycles(150);
-    (*GP).PUDCLK[0].write(1<<14 | 1<<15);
-    util::wait_cycles(150);
-    (*GP).PUDCLK[0].write(0);        // flush GPIO setup
-
-    (*UART0_ICR).write(0x7FF);    // clear interrupts
-    (*UART0_IBRD).write(2);       // 115200 baud
-    (*UART0_FBRD).write(0xB);
-    (*UART0_LCRH).write(0b11<<5); // 8n1
-    (*UART0_CR).write(0x301);     // enable Tx, Rx, FIFO
-}
 
 pub struct Uart0 {
     registers: &'static mut Registers,
@@ -93,6 +58,42 @@ impl Uart0 {
         Self {
             registers: &mut *(addr as *mut Registers),
         }
+    }
+
+    /// Set baud rate and characteristics (115200 8N1) and map to GPIO
+    pub fn init(&mut self) {
+        let r = &mut self.registers;
+
+        // initialize UART
+        r.CR.write(0);         // turn off UART0
+
+        // set up clock for consistent divisor values
+        let mut b = mbox::Mailbox::new();
+        b[0].write(8 * 4);
+        b[1].write(mbox::REQUEST);
+        b[2].write(mbox::TAG_SETCLKRATE); // set clock rate
+        b[3].write(12);
+        b[4].write(8);
+        b[5].write(2);           // UART clock
+        b[6].write(4000000);     // 4Mhz
+        b[7].write(mbox::TAG_LAST);
+        b.call(mbox::Channel::PROP1).unwrap();
+
+        for &pin in &[14, 15] {
+            let mut pin = Gpio::new(pin).into_alt(Function::Alt0);
+            pin.disable_pull();
+            util::wait_cycles(150);
+            pin.pudclk_set();
+            util::wait_cycles(150);
+            pin.pudclk_clear();
+            util::wait_cycles(150);
+        }
+
+        r.ICR.write(0x7FF);    // clear interrupts
+        r.IBRD.write(2);       // 115200 baud
+        r.FBRD.write(0xB);
+        r.LCRH.write(0b11<<5); // 8n1
+        r.CR.write(0x301);     // enable Tx, Rx, FIFO
     }
 
     /// Send a character

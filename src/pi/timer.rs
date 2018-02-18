@@ -1,4 +1,4 @@
-use gpio::IO_BASE;
+use super::IO_BASE;
 use volatile::prelude::*;
 use volatile::{Volatile, ReadVolatile};
 

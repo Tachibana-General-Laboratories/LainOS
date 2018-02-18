@@ -19,31 +19,31 @@ pub enum Function {
 
 #[repr(C)]
 #[allow(non_snake_case)]
-pub struct Registers {
-    pub FSEL: [Volatile<u32>; 6],
+struct Registers {
+    FSEL: [Volatile<u32>; 6],
     __r0: Reserved<u32>,
-    pub SET: [WriteVolatile<u32>; 2],
+    SET: [WriteVolatile<u32>; 2],
     __r1: Reserved<u32>,
-    pub CLR: [WriteVolatile<u32>; 2],
+    CLR: [WriteVolatile<u32>; 2],
     __r2: Reserved<u32>,
-    pub LEV: [ReadVolatile<u32>; 2],
+    LEV: [ReadVolatile<u32>; 2],
     __r3: Reserved<u32>,
-    pub EDS: [Volatile<u32>; 2],
+    EDS: [Volatile<u32>; 2],
     __r4: Reserved<u32>,
-    pub REN: [Volatile<u32>; 2],
+    REN: [Volatile<u32>; 2],
     __r5: Reserved<u32>,
-    pub FEN: [Volatile<u32>; 2],
+    FEN: [Volatile<u32>; 2],
     __r6: Reserved<u32>,
-    pub HEN: [Volatile<u32>; 2],
+    HEN: [Volatile<u32>; 2],
     __r7: Reserved<u32>,
-    pub LEN: [Volatile<u32>; 2],
+    LEN: [Volatile<u32>; 2],
     __r8: Reserved<u32>,
-    pub AREN: [Volatile<u32>; 2],
+    AREN: [Volatile<u32>; 2],
     __r9: Reserved<u32>,
-    pub AFEN: [Volatile<u32>; 2],
+    AFEN: [Volatile<u32>; 2],
     __r10: Reserved<u32>,
-    pub PUD: Volatile<u32>,
-    pub PUDCLK: [Volatile<u32>; 2],
+    PUD: Volatile<u32>,
+    PUDCLK: [Volatile<u32>; 2],
 }
 
 /// Possible states for a GPIO pin.
@@ -101,6 +101,13 @@ impl Gpio<Uninitialized> {
     /// Enables the alternative function `function` for `self`. Consumes self
     /// and returns a `Gpio` structure in the `Alt` state.
     pub fn into_alt(self, function: Function) -> Gpio<Alt> {
+        let index = (self.pin % 10) as usize;
+        let shift = ((self.pin / 10) * 3) as u32;
+        let value = (function as u32) << shift;
+        let mask = !(0b111 << shift);
+        let data = self.registers.FSEL[index].read();
+        self.registers.FSEL[index].write(data & mask | value);
+
         self.transition()
     }
 
@@ -120,12 +127,16 @@ impl Gpio<Uninitialized> {
 impl Gpio<Output> {
     /// Sets (turns on) the pin.
     pub fn set(&mut self) {
-        unimplemented!()
+        let index = (self.pin / 32) as usize;
+        let shift = (self.pin % 32) as u32;
+        self.registers.SET[index].write(1 << shift);
     }
 
     /// Clears (turns off) the pin.
     pub fn clear(&mut self) {
-        unimplemented!()
+        let index = (self.pin / 32) as usize;
+        let shift = (self.pin % 32) as u32;
+        self.registers.CLR[index].write(1 << shift);
     }
 }
 
@@ -133,6 +144,32 @@ impl Gpio<Input> {
     /// Reads the pin's value. Returns `true` if the level is high and `false`
     /// if the level is low.
     pub fn level(&mut self) -> bool {
-        unimplemented!()
+        let index = (self.pin / 32) as usize;
+        let shift = (self.pin % 32) as u32;
+        self.registers.LEV[index].read() & (1 << shift) != 0
+    }
+}
+
+impl Gpio<Alt> {
+    pub fn disable_pull(&mut self) {
+        self.registers.PUD.write(0b00)
+    }
+    pub fn pulldown(&mut self) {
+        self.registers.PUD.write(0b01)
+    }
+    pub fn pullup(&mut self) {
+        self.registers.PUD.write(0b10)
+    }
+
+    pub fn pudclk_set(&mut self) {
+        let index = (self.pin / 32) as usize;
+        let shift = (self.pin % 32) as u32;
+        self.registers.PUDCLK[index].and_mask(1 << shift);
+    }
+
+    pub fn pudclk_clear(&mut self) {
+        let index = (self.pin / 32) as usize;
+        let shift = (self.pin % 32) as u32;
+        self.registers.PUDCLK[index].and_mask(!(1 << shift));
     }
 }

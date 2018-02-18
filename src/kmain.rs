@@ -31,8 +31,6 @@ pub mod exception;
 pub mod mmu;
 
 #[cfg(not(test))]
-pub mod gpio;
-#[cfg(not(test))]
 pub mod pi;
 #[cfg(not(test))]
 pub mod fb;
@@ -84,7 +82,7 @@ pub extern "C" fn kernel_main() -> ! {
     init_heap();
 
     unsafe {
-        pi::uart0::init();
+        pi::uart0::Uart0::new().init();
     }
 
     println!("      .  ");

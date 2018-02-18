@@ -632,9 +632,9 @@ impl EMMCCommand {
 }
 
 const CMD_NO_RESP: u32        = 0b00 << 16; // no response
-const CMD_136BIT_RESP: u32    = 0b01 << 16; // 136 bits response 
-const CMD_48BIT_RESP: u32     = 0b10 << 16; // 48 bits response 
-const CMD_BUSY48BIT_RESP: u32 = 0b11 << 16; // 48 bits response using busy 
+const CMD_136BIT_RESP: u32    = 0b01 << 16; // 136 bits response
+const CMD_48BIT_RESP: u32     = 0b10 << 16; // 48 bits response
+const CMD_BUSY48BIT_RESP: u32 = 0b11 << 16; // 48 bits response using busy
 
 const CMD_ISDATA: u32 = 1 << 21;
 
