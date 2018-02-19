@@ -1,18 +1,19 @@
+
+// REFERENCES
+// https://docs.broadcom.com/docs/12358545
+// http://latchup.blogspot.com.au/2016/02/life-of-triangle.html
+// https://cgit.freedesktop.org/mesa/mesa/tree/src/gallium/drivers/vc4/vc4_draw.c
+
 /*
-#include <stdbool.h>							// Needed for bool and true/false
-#include <stdint.h>								// Needed for uint8_t, uint32_t, etc
-#include "rpi-smartstart.h"						// Need for mailbox
+#include <stdbool.h>                            // Needed for bool and true/false
+#include <stdint.h>                                // Needed for uint8_t, uint32_t, etc
+#include "rpi-smartstart.h"                        // Need for mailbox
 #include "rpi-GLES.h"
 
-/* REFERENCES */
-/* https://docs.broadcom.com/docs/12358545 */
-/* http://latchup.blogspot.com.au/2016/02/life-of-triangle.html */
-/* https://cgit.freedesktop.org/mesa/mesa/tree/src/gallium/drivers/vc4/vc4_draw.c */
 
 #define v3d ((volatile __attribute__((aligned(4))) uint32_t*)(uintptr_t)(RPi_IO_Base_Addr + 0xc00000))
 
 /* Registers shamelessly copied from Eric AnHolt */
-
 */
 
 // Defines for v3d register offsets
@@ -110,18 +111,25 @@ const V3D_ERRSTAT = 0xf20>>2; // Miscellaneous Error Signals (VPM, VDW, VCD, VCM
 
 
 // Flags for allocate memory.
-enum {
-    MEM_FLAG_DISCARDABLE = 1 << 0,				/* can be resized to 0 at any time. Use for cached data */
-    MEM_FLAG_NORMAL = 0 << 2,					/* normal allocating alias. Don't use from ARM */
-    MEM_FLAG_DIRECT = 1 << 2,					/* 0xC alias uncached */
-    MEM_FLAG_COHERENT = 2 << 2,					/* 0x8 alias. Non-allocating in L2 but coherent */
-    MEM_FLAG_L1_NONALLOCATING = (MEM_FLAG_DIRECT | MEM_FLAG_COHERENT), /* Allocating in L2 */
-    MEM_FLAG_ZERO = 1 << 4,						/* initialise buffer to all zeros */
-    MEM_FLAG_NO_INIT = 1 << 5,					/* don't initialise (default is initialise to all ones */
-    MEM_FLAG_HINT_PERMALOCK = 1 << 6,			/* Likely to be locked for long periods of time. */
-};
 
-/* primitive typoe in the GL pipline */
+/// can be resized to 0 at any time. Use for cached data
+const MEM_FLAG_DISCARDABLE = 1 << 0;
+/// normal allocating alias. Don't use from ARM
+const MEM_FLAG_NORMAL = 0 << 2;
+/// 0xC alias uncached
+const MEM_FLAG_DIRECT = 1 << 2;
+/// 0x8 alias. Non-allocating in L2 but coherent
+const MEM_FLAG_COHERENT = 2 << 2;
+/// Allocating in L2
+const MEM_FLAG_L1_NONALLOCATING = (MEM_FLAG_DIRECT | MEM_FLAG_COHERENT);
+/// initialise buffer to all zeros
+const MEM_FLAG_ZERO = 1 << 4;
+/// don't initialise (default is initialise to all ones
+const MEM_FLAG_NO_INIT = 1 << 5;
+/// Likely to be locked for long periods of time.
+const MEM_FLAG_HINT_PERMALOCK = 1 << 6;
+
+/// primitive typoe in the GL pipline
 enum Primitive {
     PRIM_POINT = 0,
     PRIM_LINE = 1,
@@ -130,9 +138,9 @@ enum Primitive {
     PRIM_TRIANGLE = 4,
     PRIM_TRIANGLE_STRIP = 5,
     PRIM_TRIANGLE_FAN = 6,
-};
+}
 
-/* GL pipe control commands */
+/// GL pipe control commands
 enum GL_CONTROL {
     GL_HALT = 0,
     GL_NOP = 1,
@@ -174,74 +182,64 @@ enum GL_CONTROL {
     GL_TILE_BINNING_CONFIG = 112,
     GL_TILE_RENDER_CONFIG = 113,
     GL_CLEAR_COLORS = 114,
-    GL_TILE_COORDINATES = 115
-};
+    GL_TILE_COORDINATES = 115,
+}
 
+#[repr(align(1))]
+struct EMITDATA {
+    byte1: u8,
+    byte2: u8,
+    byte3: u8,
+    byte4: u8,
+}
 
-struct __attribute__((__packed__, aligned(1))) EMITDATA {
-    uint8_t byte1;
-    uint8_t byte2;
-    uint8_t byte3;
-    uint8_t byte4;
-};
-
-
-bool InitV3D (void) {
-    if (mailbox_tag_message(0, 9,
-        MAILBOX_TAG_SET_CLOCK_RATE, 8, 8,
-        CLK_V3D_ID, 250000000,
-        MAILBOX_TAG_ENABLE_QPU, 4, 4, 1)) {
-        if (v3d[V3D_IDENT0] == 0x02443356) { // Magic number.
-            return true;
-        }
+pub fn InitV3D() -> Result<(), ()> {
+    if mbox::Mailbox::new().tag_message(&[
+        mbox::Tag::SET_CLOCK_RATE, 8, 8, mbox::ClockId::V3D, 250000000,
+        mbox::Tag::ENABLE_QPU, 4, 4, 1,
+    ]).is_some() && v3d[V3D_IDENT0].read() == 0x02443356 {
+        Ok(())
+    } else {
+        Err(())
     }
-    return false;
 }
 
-uint32_t V3D_mem_alloc (uint32_t size, uint32_t align, uint32_t flags)
-{
-    uint32_t buffer[6];
-    if (mailbox_tag_message(&buffer[0], 6,
-        MAILBOX_TAG_ALLOCATE_MEMORY, 12, 12, size, align, flags)) {
-        return buffer[3];
+pub fn V3D_mem_alloc(size: u32, align: u32, flags: u32) -> u32 {
+    if let Some(buffer) = mbox::Mailbox::new().tag_message(&[mbox::Tag::ALLOCATE_MEMORY, 12, 12, size, align, flags]) {
+        buffer[3 + 3]
+    } else {
+        0
     }
-    return 0;
 }
 
-bool V3D_mem_free (uint32_t handle)
-{
-    return (mailbox_tag_message(0, 4,
-        MAILBOX_TAG_RELEASE_MEMORY, 4, 4, handle));
+pub fn V3D_mem_free(handle: u32) {
+    mbox::Mailbox::new().tag_message(&[mbox::Tag::RELEASE_MEMORY as u32, 4, 4, handle]).is_ok()
 }
 
-uint32_t V3D_mem_lock (uint32_t handle)
-{
-    uint32_t buffer[4];
-    if (mailbox_tag_message(&buffer[0], 4,
-        MAILBOX_TAG_LOCK_MEMORY, 4, 4, handle)) {
-        return buffer[3];
+pub fn V3D_mem_lock(handle: u32) -> u32 {
+    if let Some(buffer) = mbox::Mailbox::new().tag_message(&[mbox::Tag::LOCK_MEMORY, 4, 4, handle) {
+        buffer[3 + 3]
+    } else {
+        0
     }
-    return 0;
 }
 
-bool V3D_mem_unlock (uint32_t handle)
-{
-    return (mailbox_tag_message(0, 4,
-        MAILBOX_TAG_UNLOCK_MEMORY, 4, 4, handle));
+pub fn V3D_mem_unlock(handle: u32) -> bool {
+    mbox::Mailbox::new().tag_message(&[mbox::Tag::UNLOCK_MEMORY as u32, 4, 4, handle]).is_ok()
 }
 
-bool V3D_execute_code (uint32_t code, uint32_t r0, uint32_t r1, uint32_t r2, uint32_t r3, uint32_t r4, uint32_t r5)
-{
-    return (mailbox_tag_message(0, 10,
-        MAILBOX_TAG_EXECUTE_CODE, 28, 28,
-        code, r0, r1, r2, r3, r4, r5));
+fn V3D_execute_code(code: u32, r0: u32, r1: u32, r2: u32, r3: u32, r4: u32, r5: u32) -> bool {
+    mbox::Mailbox::new().tag_message(&[
+        mbox::Tag::EXECUTE_CODE as u32, 28, 28,
+        code, r0, r1, r2, r3, r4, r5,
+    ]).is_ok()
 }
 
-bool V3D_execute_qpu (int32_t num_qpus, uint32_t control, uint32_t noflush, uint32_t timeout) 
-{
-    return (mailbox_tag_message(0, 7,
-        MAILBOX_TAG_EXECUTE_QPU, 16, 16,
-        num_qpus, control, noflush, timeout));
+fn V3D_execute_qpu(num_qpus: i32, control: u32, noflush: u32, timeout: u32) -> bool {
+    mbox::Mailbox::new().tag_message(&[
+        mbox::Tag::EXECUTE_QPU as u32, 28, 28,
+        num_qpus as u32, control, noflush, timeout
+    ]).is_ok()
 }
 
 
@@ -287,8 +285,8 @@ void testTriangle (uint16_t renderWth, uint16_t renderHt, uint32_t renderBufferA
     const BUFFER_TILE_STATE: usize = 0x200;
     const BUFFER_TILE_DATA: usize =  0x6000;
     const BUFFER_RENDER_CONTROL: usize = 0xe200;
-    const BUFFER_FRAGMENT_SHADER: usize =	0xfe00;
-    const BUFFER_FRAGMENT_UNIFORM: usize =	0xff00;
+    const BUFFER_FRAGMENT_SHADER: usize =    0xfe00;
+    const BUFFER_FRAGMENT_UNIFORM: usize =    0xff00;
 
     uint32_t handle = V3D_mem_alloc(0x800000, 0x1000, MEM_FLAG_COHERENT | MEM_FLAG_ZERO);
     if (!handle) {
@@ -308,53 +306,53 @@ void testTriangle (uint16_t renderWth, uint16_t renderHt, uint32_t renderBufferA
     //   we will need binWth of them across to cover the render width
     //   we will need binHt of them down to cover the render height
     //   we add 63 before the division because any fraction at end must have a bin
-    uint_fast32_t binWth = (renderWth + 63) / 64;					// Tiles across 
-    uint_fast32_t binHt = (renderHt + 63) / 64;						// Tiles down 
+    uint_fast32_t binWth = (renderWth + 63) / 64;                    // Tiles across 
+    uint_fast32_t binHt = (renderHt + 63) / 64;                        // Tiles down 
 
-    emit_uint8_t(&p, GL_TILE_BINNING_CONFIG);						// tile binning config control 
-    emit_uint32_t(&p, bus_addr + BUFFER_TILE_DATA);					// tile allocation memory address
-    emit_uint32_t(&p, 0x4000);										// tile allocation memory size
-    emit_uint32_t(&p, bus_addr + BUFFER_TILE_STATE);				// Tile state data address
-    emit_uint8_t(&p, binWth);										// renderWidth/64
-    emit_uint8_t(&p, binHt);										// renderHt/64
-    emit_uint8_t(&p, 0x04);											// config
+    emit_uint8_t(&p, GL_TILE_BINNING_CONFIG);                        // tile binning config control 
+    emit_uint32_t(&p, bus_addr + BUFFER_TILE_DATA);                    // tile allocation memory address
+    emit_uint32_t(&p, 0x4000);                                        // tile allocation memory size
+    emit_uint32_t(&p, bus_addr + BUFFER_TILE_STATE);                // Tile state data address
+    emit_uint8_t(&p, binWth);                                        // renderWidth/64
+    emit_uint8_t(&p, binHt);                                        // renderHt/64
+    emit_uint8_t(&p, 0x04);                                            // config
 
     // Start tile binning.
-    emit_uint8_t(&p, GL_START_TILE_BINNING);						// Start binning command
+    emit_uint8_t(&p, GL_START_TILE_BINNING);                        // Start binning command
 
     // Primitive type
     emit_uint8_t(&p, GL_PRIMITIVE_LIST_FORMAT);
-    emit_uint8_t(&p, 0x32);											// 16 bit triangle
+    emit_uint8_t(&p, 0x32);                                            // 16 bit triangle
 
     // Clip Window
-    emit_uint8_t(&p, GL_CLIP_WINDOW);								// Clip window 
-    emit_uint16_t(&p, 0);											// 0
-    emit_uint16_t(&p, 0);											// 0
-    emit_uint16_t(&p, renderWth);									// width
-    emit_uint16_t(&p, renderHt);									// height
+    emit_uint8_t(&p, GL_CLIP_WINDOW);                                // Clip window 
+    emit_uint16_t(&p, 0);                                            // 0
+    emit_uint16_t(&p, 0);                                            // 0
+    emit_uint16_t(&p, renderWth);                                    // width
+    emit_uint16_t(&p, renderHt);                                    // height
 
     // GL State
     emit_uint8_t(&p, GL_CONFIG_STATE);
-    emit_uint8_t(&p, 0x03);											// enable both foward and back facing polygons
-    emit_uint8_t(&p, 0x00);											// depth testing disabled
-    emit_uint8_t(&p, 0x02);											// enable early depth write
+    emit_uint8_t(&p, 0x03);                                            // enable both foward and back facing polygons
+    emit_uint8_t(&p, 0x00);                                            // depth testing disabled
+    emit_uint8_t(&p, 0x02);                                            // enable early depth write
 
     // Viewport offset
-    emit_uint8_t(&p, GL_VIEWPORT_OFFSET);							// Viewport offset
-    emit_uint16_t(&p, 0);											// 0
-    emit_uint16_t(&p, 0);											// 0
+    emit_uint8_t(&p, GL_VIEWPORT_OFFSET);                            // Viewport offset
+    emit_uint16_t(&p, 0);                                            // 0
+    emit_uint16_t(&p, 0);                                            // 0
 
     // The triangle
     // No Vertex Shader state (takes pre-transformed vertexes so we don't have to supply a working coordinate shader.)
     emit_uint8_t(&p, GL_NV_SHADER_STATE);
-    emit_uint32_t(&p, bus_addr + BUFFER_SHADER_OFFSET);				// Shader Record
+    emit_uint32_t(&p, bus_addr + BUFFER_SHADER_OFFSET);                // Shader Record
 
     // primitive index list
-    emit_uint8_t(&p, GL_INDEXED_PRIMITIVE_LIST);					// Indexed primitive list command
-    emit_uint8_t(&p, PRIM_TRIANGLE);								// 8bit index, triangles
-    emit_uint32_t(&p, 9);											// Length
-    emit_uint32_t(&p, bus_addr + BUFFER_VERTEX_INDEX);				// address
-    emit_uint32_t(&p, 6);											// Maximum index
+    emit_uint8_t(&p, GL_INDEXED_PRIMITIVE_LIST);                    // Indexed primitive list command
+    emit_uint8_t(&p, PRIM_TRIANGLE);                                // 8bit index, triangles
+    emit_uint32_t(&p, 9);                                            // Length
+    emit_uint32_t(&p, bus_addr + BUFFER_VERTEX_INDEX);                // address
+    emit_uint32_t(&p, 6);                                            // Maximum index
 
 
     // End of bin list
@@ -369,52 +367,52 @@ void testTriangle (uint16_t renderWth, uint16_t renderHt, uint32_t renderBufferA
 
     // Okay now we need Shader Record to buffer
     p = list + BUFFER_SHADER_OFFSET;
-    emit_uint8_t(&p, 0x01);											// flags
-    emit_uint8_t(&p, 6 * 4);										// stride
-    emit_uint8_t(&p, 0xcc);											// num uniforms (not used)
-    emit_uint8_t(&p, 3);											// num varyings
-    emit_uint32_t(&p, bus_addr + BUFFER_FRAGMENT_SHADER);			// Fragment shader code
-    emit_uint32_t(&p, bus_addr + BUFFER_FRAGMENT_UNIFORM);			// Fragment shader uniforms
-    emit_uint32_t(&p, bus_addr + BUFFER_VERTEX_DATA);				// Vertex Data
+    emit_uint8_t(&p, 0x01);                                            // flags
+    emit_uint8_t(&p, 6 * 4);                                        // stride
+    emit_uint8_t(&p, 0xcc);                                            // num uniforms (not used)
+    emit_uint8_t(&p, 3);                                            // num varyings
+    emit_uint32_t(&p, bus_addr + BUFFER_FRAGMENT_SHADER);            // Fragment shader code
+    emit_uint32_t(&p, bus_addr + BUFFER_FRAGMENT_UNIFORM);            // Fragment shader uniforms
+    emit_uint32_t(&p, bus_addr + BUFFER_VERTEX_DATA);                // Vertex Data
 
 
     /* Setup triangle vertices from OpenGL tutorial which used this */
     // fTriangle[0] = -0.4f; fTriangle[1] = 0.1f; fTriangle[2] = 0.0f;
     // fTriangle[3] = 0.4f; fTriangle[4] = 0.1f; fTriangle[5] = 0.0f;
     // fTriangle[6] = 0.0f; fTriangle[7] = 0.7f; fTriangle[8] = 0.0f;
-    uint_fast32_t centreX = renderWth / 2;							// triangle centre x
-    uint_fast32_t centreY = (uint_fast32_t)(0.4f * (renderHt / 2));	// triangle centre y
+    uint_fast32_t centreX = renderWth / 2;                            // triangle centre x
+    uint_fast32_t centreY = (uint_fast32_t)(0.4f * (renderHt / 2));    // triangle centre y
     uint_fast32_t half_shape_wth = (uint_fast32_t)(0.4f * (renderWth / 2));// Half width of triangle
     uint_fast32_t half_shape_ht = (uint_fast32_t)(0.3f * (renderHt / 2));  // half height of tringle
 
     // Vertex Data
     p = list + BUFFER_VERTEX_DATA;
     // Vertex: Top, vary red
-    emit_uint16_t(&p, (centreX) << 4);								// X in 12.4 fixed point
-    emit_uint16_t(&p, (centreY - half_shape_ht) << 4);				// Y in 12.4 fixed point
-    emit_float(&p, 1.0f);											// Z
-    emit_float(&p, 1.0f);											// 1/W
-    emit_float(&p, 1.0f);											// Varying 0 (Red)
-    emit_float(&p, 0.0f);											// Varying 1 (Green)
-    emit_float(&p, 0.0f);											// Varying 2 (Blue)
+    emit_uint16_t(&p, (centreX) << 4);                                // X in 12.4 fixed point
+    emit_uint16_t(&p, (centreY - half_shape_ht) << 4);                // Y in 12.4 fixed point
+    emit_float(&p, 1.0f);                                            // Z
+    emit_float(&p, 1.0f);                                            // 1/W
+    emit_float(&p, 1.0f);                                            // Varying 0 (Red)
+    emit_float(&p, 0.0f);                                            // Varying 1 (Green)
+    emit_float(&p, 0.0f);                                            // Varying 2 (Blue)
 
     // Vertex: bottom left, vary blue
-    emit_uint16_t(&p, (centreX - half_shape_wth) << 4);				// X in 12.4 fixed point
-    emit_uint16_t(&p, (centreY + half_shape_ht) << 4);				// Y in 12.4 fixed point
-    emit_float(&p, 1.0f);											// Z
-    emit_float(&p, 1.0f);											// 1/W
-    emit_float(&p, 0.0f);											// Varying 0 (Red)
-    emit_float(&p, 0.0f);											// Varying 1 (Green)
-    emit_float(&p, 1.0f);											// Varying 2 (Blue)
+    emit_uint16_t(&p, (centreX - half_shape_wth) << 4);                // X in 12.4 fixed point
+    emit_uint16_t(&p, (centreY + half_shape_ht) << 4);                // Y in 12.4 fixed point
+    emit_float(&p, 1.0f);                                            // Z
+    emit_float(&p, 1.0f);                                            // 1/W
+    emit_float(&p, 0.0f);                                            // Varying 0 (Red)
+    emit_float(&p, 0.0f);                                            // Varying 1 (Green)
+    emit_float(&p, 1.0f);                                            // Varying 2 (Blue)
 
     // Vertex: bottom right, vary green 
-    emit_uint16_t(&p, (centreX + half_shape_wth) << 4);				// X in 12.4 fixed point
-    emit_uint16_t(&p, (centreY + half_shape_ht) << 4);				// Y in 12.4 fixed point
-    emit_float(&p, 1.0f);											// Z
-    emit_float(&p, 1.0f);											// 1/W
-    emit_float(&p, 0.0f);											// Varying 0 (Red)
-    emit_float(&p, 1.0f);											// Varying 1 (Green)
-    emit_float(&p, 0.0f);											// Varying 2 (Blue)
+    emit_uint16_t(&p, (centreX + half_shape_wth) << 4);                // X in 12.4 fixed point
+    emit_uint16_t(&p, (centreY + half_shape_ht) << 4);                // Y in 12.4 fixed point
+    emit_float(&p, 1.0f);                                            // Z
+    emit_float(&p, 1.0f);                                            // 1/W
+    emit_float(&p, 0.0f);                                            // Varying 0 (Red)
+    emit_float(&p, 1.0f);                                            // Varying 1 (Green)
+    emit_float(&p, 0.0f);                                            // Varying 2 (Blue)
 
 
     /* Setup triangle vertices from OpenGL tutorial which used this */
@@ -422,57 +420,57 @@ void testTriangle (uint16_t renderWth, uint16_t renderHt, uint32_t renderBufferA
     // fQuad[3] = -0.2f; fQuad[4] = -0.6f; fQuad[5] = 0.0f;
     // fQuad[6] = 0.2f; fQuad[7] = -0.1f; fQuad[8] = 0.0f;
     // fQuad[9] = 0.2f; fQuad[10] = -0.6f; fQuad[11] = 0.0f;
-    centreY = (uint_fast32_t)(1.35f * (renderHt / 2));				// quad centre y
+    centreY = (uint_fast32_t)(1.35f * (renderHt / 2));                // quad centre y
 
     // Vertex: Top, left  vary blue
-    emit_uint16_t(&p, (centreX - half_shape_wth) << 4);				// X in 12.4 fixed point
-    emit_uint16_t(&p, (centreY - half_shape_ht) << 4);				// Y in 12.4 fixed point
-    emit_float(&p, 1.0f);											// Z
-    emit_float(&p, 1.0f);											// 1/W
-    emit_float(&p, 0.0f);											// Varying 0 (Red)
-    emit_float(&p, 0.0f);											// Varying 1 (Green)
-    emit_float(&p, 1.0f);											// Varying 2 (Blue)
+    emit_uint16_t(&p, (centreX - half_shape_wth) << 4);                // X in 12.4 fixed point
+    emit_uint16_t(&p, (centreY - half_shape_ht) << 4);                // Y in 12.4 fixed point
+    emit_float(&p, 1.0f);                                            // Z
+    emit_float(&p, 1.0f);                                            // 1/W
+    emit_float(&p, 0.0f);                                            // Varying 0 (Red)
+    emit_float(&p, 0.0f);                                            // Varying 1 (Green)
+    emit_float(&p, 1.0f);                                            // Varying 2 (Blue)
 
     // Vertex: bottom left, vary Green
-    emit_uint16_t(&p, (centreX - half_shape_wth) << 4);				// X in 12.4 fixed point
-    emit_uint16_t(&p, (centreY + half_shape_ht) << 4);				// Y in 12.4 fixed point
-    emit_float(&p, 1.0f);											// Z
-    emit_float(&p, 1.0f);											// 1/W
-    emit_float(&p, 0.0f);											// Varying 0 (Red)
-    emit_float(&p, 1.0f);											// Varying 1 (Green)
-    emit_float(&p, 0.0f);											// Varying 2 (Blue)
+    emit_uint16_t(&p, (centreX - half_shape_wth) << 4);                // X in 12.4 fixed point
+    emit_uint16_t(&p, (centreY + half_shape_ht) << 4);                // Y in 12.4 fixed point
+    emit_float(&p, 1.0f);                                            // Z
+    emit_float(&p, 1.0f);                                            // 1/W
+    emit_float(&p, 0.0f);                                            // Varying 0 (Red)
+    emit_float(&p, 1.0f);                                            // Varying 1 (Green)
+    emit_float(&p, 0.0f);                                            // Varying 2 (Blue)
 
     // Vertex: top right, vary red
-    emit_uint16_t(&p, (centreX + half_shape_wth) << 4);				// X in 12.4 fixed point
-    emit_uint16_t(&p, (centreY - half_shape_ht) << 4);				// Y in 12.4 fixed point
-    emit_float(&p, 1.0f);											// Z
-    emit_float(&p, 1.0f);											// 1/W
-    emit_float(&p, 1.0f);											// Varying 0 (Red)
-    emit_float(&p, 0.0f);											// Varying 1 (Green)
-    emit_float(&p, 0.0f);											// Varying 2 (Blue)
+    emit_uint16_t(&p, (centreX + half_shape_wth) << 4);                // X in 12.4 fixed point
+    emit_uint16_t(&p, (centreY - half_shape_ht) << 4);                // Y in 12.4 fixed point
+    emit_float(&p, 1.0f);                                            // Z
+    emit_float(&p, 1.0f);                                            // 1/W
+    emit_float(&p, 1.0f);                                            // Varying 0 (Red)
+    emit_float(&p, 0.0f);                                            // Varying 1 (Green)
+    emit_float(&p, 0.0f);                                            // Varying 2 (Blue)
 
     // Vertex: bottom right, vary yellow
-    emit_uint16_t(&p, (centreX + half_shape_wth) << 4);				// X in 12.4 fixed point
-    emit_uint16_t(&p, (centreY + half_shape_ht) << 4);				// Y in 12.4 fixed point
-    emit_float(&p, 1.0f);											// Z
-    emit_float(&p, 1.0f);											// 1/W
-    emit_float(&p, 0.0f);											// Varying 0 (Red)
-    emit_float(&p, 1.0f);											// Varying 1 (Green)
-    emit_float(&p, 1.0f);											// Varying 2 (Blue)
+    emit_uint16_t(&p, (centreX + half_shape_wth) << 4);                // X in 12.4 fixed point
+    emit_uint16_t(&p, (centreY + half_shape_ht) << 4);                // Y in 12.4 fixed point
+    emit_float(&p, 1.0f);                                            // Z
+    emit_float(&p, 1.0f);                                            // 1/W
+    emit_float(&p, 0.0f);                                            // Varying 0 (Red)
+    emit_float(&p, 1.0f);                                            // Varying 1 (Green)
+    emit_float(&p, 1.0f);                                            // Varying 2 (Blue)
 
     // Vertex list
     p = list + BUFFER_VERTEX_INDEX;
-    emit_uint8_t(&p, 0);											// tri - top
-    emit_uint8_t(&p, 1);											// tri - bottom left
-    emit_uint8_t(&p, 2);											// tri - bottom right
+    emit_uint8_t(&p, 0);                                            // tri - top
+    emit_uint8_t(&p, 1);                                            // tri - bottom left
+    emit_uint8_t(&p, 2);                                            // tri - bottom right
 
-    emit_uint8_t(&p, 3);											// quad - top left
-    emit_uint8_t(&p, 4);											// quad - bottom left
-    emit_uint8_t(&p, 5);											// quad - top right
+    emit_uint8_t(&p, 3);                                            // quad - top left
+    emit_uint8_t(&p, 4);                                            // quad - bottom left
+    emit_uint8_t(&p, 5);                                            // quad - top right
 
-    emit_uint8_t(&p, 4);											// quad - bottom left
-    emit_uint8_t(&p, 6);											// quad - bottom right
-    emit_uint8_t(&p, 5);											// quad - top right
+    emit_uint8_t(&p, 4);                                            // quad - bottom left
+    emit_uint8_t(&p, 6);                                            // quad - bottom right
+    emit_uint8_t(&p, 5);                                            // quad - top right
 
     // fragment shader
     p = list + BUFFER_FRAGMENT_SHADER;
@@ -500,19 +498,19 @@ void testTriangle (uint16_t renderWth, uint16_t renderHt, uint32_t renderBufferA
 
     // Clear colors
     emit_uint8_t(&p, GL_CLEAR_COLORS);
-    emit_uint32_t(&p, 0xff000000);			// Opaque Black
-    emit_uint32_t(&p, 0xff000000);			// 32 bit clear colours need to be repeated twice
+    emit_uint32_t(&p, 0xff000000);            // Opaque Black
+    emit_uint32_t(&p, 0xff000000);            // 32 bit clear colours need to be repeated twice
     emit_uint32_t(&p, 0);
     emit_uint8_t(&p, 0);
 
     // Tile Rendering Mode Configuration
     emit_uint8_t(&p, GL_TILE_RENDER_CONFIG);
 
-    emit_uint32_t(&p, renderBufferAddr);	// render address
+    emit_uint32_t(&p, renderBufferAddr);    // render address
 
-    emit_uint16_t(&p, renderWth);			// width
-    emit_uint16_t(&p, renderHt);			// height
-    emit_uint8_t(&p, 0x04);					// framebuffer mode (linear rgba8888)
+    emit_uint16_t(&p, renderWth);            // width
+    emit_uint16_t(&p, renderHt);            // height
+    emit_uint8_t(&p, 0x04);                    // framebuffer mode (linear rgba8888)
     emit_uint8_t(&p, 0x00);
 
     // Do a store of the first tile to force the tile buffer to be cleared
@@ -522,8 +520,8 @@ void testTriangle (uint16_t renderWth, uint16_t renderHt, uint32_t renderBufferA
     emit_uint8_t(&p, 0);
     // Store Tile Buffer General
     emit_uint8_t(&p, GL_STORE_TILE_BUFFER);
-    emit_uint16_t(&p, 0);					// Store nothing (just clear)
-    emit_uint32_t(&p, 0);					// no address is needed
+    emit_uint16_t(&p, 0);                    // Store nothing (just clear)
+    emit_uint32_t(&p, 0);                    // no address is needed
 
     // Link all binned lists together
     for (int x = 0; x < binWth; x++) {
@@ -569,7 +567,7 @@ void testTriangle (uint16_t renderWth, uint16_t renderHt, uint32_t renderBufferA
     v3d[V3D_CT0CS] = 0x20;
 
     // Run our render
-    v3d[V3D_RFC] = 1;						// reset rendering frame count
+    v3d[V3D_RFC] = 1;                        // reset rendering frame count
     v3d[V3D_CT1CA] = bus_addr + BUFFER_RENDER_CONTROL;
     v3d[V3D_CT1EA] = bus_addr + BUFFER_RENDER_CONTROL + render_length;
 

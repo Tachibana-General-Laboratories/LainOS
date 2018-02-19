@@ -23,6 +23,7 @@ pub enum Channel {
 
 /// enumerated mailbox clock id
 /// see https://github.com/raspberrypi/firmware/wiki/Mailboxes
+#[repr(u32)]
 #[allow(non_camel_case_types)]
 pub enum ClockId {
     EMMC = 0x1,  // Mailbox Tag Channel EMMC clock ID 
@@ -39,6 +40,7 @@ pub enum ClockId {
 
 /// enumerated mailbox tag channel commands
 /// see https://github.com/raspberrypi/firmware/wiki/Mailbox-property-interface
+#[repr(u32)]
 #[allow(non_camel_case_types)]
 pub enum Tag {
     // Videocore info commands
