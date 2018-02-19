@@ -15,17 +15,10 @@ const PM_RSTC_FULLRST: u32 = 0x00000020;
 /// Shutdown the board
 pub fn power_off() {
     // power off devices one by one
-    let mut b = mbox::Mailbox::new();
     for device_id in 0..16 {
-        b[0].write(8*4);
-        b[1].write(mbox::REQUEST);
-        b[2].write(mbox::TAG_SETPOWER); // set power state
-        b[3].write(8);
-        b[4].write(8);
-        b[5].write(device_id);   // device id
-        b[6].write(0);           // bit 0: off, bit 1: no wait
-        b[7].write(mbox::TAG_LAST);
-        b.call(mbox::Channel::PROP1).unwrap();
+        let _ = mbox::Mailbox::new().tag_message(&[
+            mbox::Tag::SET_POWER_STATE as u32, 8, 8, device_id, 0, // bit 0: off, bit 1: no wait
+        ]);
     }
 
     unsafe {
@@ -66,6 +59,13 @@ pub fn reset() {
     (*PM_RSTS).write(PM_WDOG_MAGIC | r);   // boot from partition 0
     (*PM_WDOG).write(PM_WDOG_MAGIC | 10);
     (*PM_RSTC).write(PM_WDOG_MAGIC | PM_RSTC_FULLRST);
+    }
+}
+
+pub fn halt() {
+    unsafe {
+        asm!("1: wfe;
+                b 1b" :::: "volatile");
     }
 }
 

@@ -16,6 +16,9 @@ extern crate stack_vec;
 extern crate volatile;
 
 #[macro_use]
+extern crate log;
+
+#[macro_use]
 #[cfg(not(test))]
 pub mod print;
 
@@ -91,7 +94,7 @@ pub extern "C" fn kernel_main() -> ! {
     println!("    ./ \\.");
     println!("");
 
-    let mut s = String::from("fucking string!");
+    let s = String::from("fucking string!");
 
     println!("Hello Rust Kernel world! 0x{:X} {}", 0xDEAD, s);
 
@@ -121,11 +124,12 @@ pub extern "C" fn kernel_main() -> ! {
             mmu::init();
         }
 
-            /*
+        if false {
+            use volatile::*;
             // generate a Data Abort with a bad address access
-            let mut r = gpio::Mmio::new(0xFFFF_FFFF_FF00_0000);
-            r.write(1u32);
-            */
+            let r = 0xFFFF_FFFF_FF00_0000 as *mut Volatile<u32>;
+            unsafe { (*r).write(1) }
+        }
 
         const KERNEL_UART0: usize = 0xFFFFFF80_3F201000;
 
@@ -172,16 +176,18 @@ pub extern "C" fn kernel_main() -> ! {
         rgb: false,
     };
 
-    match fb::init(info) {
-        Some(fb) =>  {
-            fb.fill_rgba(0xFF0000);
-            fb::font().uprint(&fb, 15, 5, "Prepare uranus!", 0x00FF00, 0x0000FF);
-            fb::font().uprint(&fb, 15, 6, "Prepare uranus!", 0xFF0000, 0x0000FF);
-            fb::font().uprint(&fb, 13, 8, "< Prepare uranus! >", 0xFF0000, 0x000000);
+    println!("init fb");
 
-            fb::font().uprint(&fb, 20, 10, "  .  ",  0x000000, 0xFF0000);
-            fb::font().uprint(&fb, 20, 11, "< 0 >",  0x000000, 0xFF0000);
-            fb::font().uprint(&fb, 20, 12, "./ \\.", 0x000000, 0xFF0000);
+    match fb::init(info) {
+        Some(mut fb) =>  {
+            fb.fill_rgba(0xFF0000);
+            fb::font().uprint(&mut fb, 15, 5, "Prepare uranus!", 0x00FF00, 0x0000FF);
+            fb::font().uprint(&mut fb, 15, 6, "Prepare uranus!", 0xFF0000, 0x0000FF);
+            fb::font().uprint(&mut fb, 13, 8, "< Prepare uranus! >", 0xFF0000, 0x000000);
+
+            fb::font().uprint(&mut fb, 20, 10, "  .  ",  0x000000, 0xFF0000);
+            fb::font().uprint(&mut fb, 20, 11, "< 0 >",  0x000000, 0xFF0000);
+            fb::font().uprint(&mut fb, 20, 12, "./ \\.", 0x000000, 0xFF0000);
 
         }
         None => println!("Unable to set screen resolution to 1024x768x32"),

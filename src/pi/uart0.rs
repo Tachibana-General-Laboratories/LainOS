@@ -55,16 +55,9 @@ impl Uart0 {
         self.registers.CR.write(0);         // turn off UART0
 
         // set up clock for consistent divisor values
-        let mut b = mbox::Mailbox::new();
-        b[0].write(8 * 4);
-        b[1].write(mbox::REQUEST);
-        b[2].write(mbox::TAG_SETCLKRATE); // set clock rate
-        b[3].write(12);
-        b[4].write(8);
-        b[5].write(2);           // UART clock
-        b[6].write(4000000);     // 4Mhz
-        b[7].write(mbox::TAG_LAST);
-        b.call(mbox::Channel::PROP1).unwrap();
+        mbox::Mailbox::new().tag_message(&[
+            mbox::Tag::SET_CLOCK_RATE as u32, 12, 8, 2, 4000000, // UART clock on 4Mhz
+        ]).unwrap();
 
         for &pin in &[14, 15] {
             let mut pin = Gpio::new(pin).into_alt(gpio::Function::Alt0);

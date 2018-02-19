@@ -19,6 +19,8 @@ stack-vec = { path = "stack-vec" }
 volatile = { path = "volatile" }
 std = { path = "std" }
 
+log = { version = "0.4", features = ["max_level_debug", "release_max_level_warn"] }
+
 [lib]
 crate-type = ["staticlib"]
 path = "src/kmain.rs"

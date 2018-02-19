@@ -100,6 +100,10 @@ fn run_cmd(cmd: Command) {
             print!("power-off the machine\n");
             power::power_off();
         }
+        "halt" => {
+            print!("halt the machine\n");
+            power::halt();
+        }
         "reset" => {
             print!("reset the machine\n");
             power::reset();
@@ -146,5 +150,5 @@ fn dump<'a>(args: StackVec<'a, &'a str>) {
         256
     };
 
-    util::dump(unsafe { addr as *const u8 }, size);
+    util::dump(addr as *const u8, size);
 }
