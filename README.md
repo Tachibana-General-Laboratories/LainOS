@@ -10,3 +10,9 @@
 - `/usr/` home directories
 - `/var/` contains variable files
 
+## References
+
+- https://web.stanford.edu/class/cs140e/
+- https://github.com/shacharr/videocoreiv-qpu-driver
+- https://github.com/raspberrypi
+- http://jaystation2.maisonikkoku.com/

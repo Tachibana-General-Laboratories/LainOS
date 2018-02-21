@@ -44,6 +44,7 @@ pub mod fb;
 pub mod shell;
 //pub mod sd;
 pub mod sdn;
+pub mod gles;
 
 
 pub mod allocator;
@@ -192,6 +193,8 @@ pub extern "C" fn kernel_main() -> ! {
         }
         None => println!("Unable to set screen resolution to 1024x768x32"),
     }
+
+    println!("init gles: {:?}", gles::InitV3D());
 
     shell::shell("> ")
 }
