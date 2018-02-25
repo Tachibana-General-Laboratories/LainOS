@@ -428,7 +428,7 @@ impl<'a> Buffer<'a> {
 }
 
 // Render a single triangle to memory.
-fn testTriangle(render_w: u16, render_h: u16, render_buffer_addr: u32/*, prn_handler: printhandler*/) {
+fn test_triangle(render_w: u16, render_h: u16, render_buffer_addr: u32/*, prn_handler: printhandler*/) {
     // We allocate/lock some videocore memory
     // I'm just shoving everything in a single buffer because I'm lazy 8Mb, 4k alignment
     // Normally you would do individual allocations but not sure of interface I want yet
@@ -515,87 +515,65 @@ fn testTriangle(render_w: u16, render_h: u16, render_buffer_addr: u32/*, prn_han
 
     // Vertex Data
     {
+        let mut p = Buffer::start(&mut bus.slice()[BUFFER_VERTEX_DATA..]);
+
         // Setup triangle vertices from OpenGL tutorial which used this
-        // fTriangle[0] = -0.4f; fTriangle[1] = 0.1f; fTriangle[2] = 0.0f;
-        // fTriangle[3] = 0.4f; fTriangle[4] = 0.1f; fTriangle[5] = 0.0f;
-        // fTriangle[6] = 0.0f; fTriangle[7] = 0.7f; fTriangle[8] = 0.0f;
+        // [0] = -0.4; [1] = 0.1; [2] = 0.0;
+        // [3] =  0.4; [4] = 0.1; [5] = 0.0;
+        // [6] =  0.0; [7] = 0.7; [8] = 0.0;
         let cx = (render_w / 2) as u16;
         let cy = (0.4 * (render_h as f32 / 2.0)) as u16;
         let half_w = (0.4 * (render_w as f32 / 2.0)) as u16;
         let half_h = (0.3 * (render_h as f32 / 2.0)) as u16;
 
-        let mut p = Buffer::start(&mut bus.slice()[BUFFER_VERTEX_DATA..]);
-
         // Vertex: Top, vary red
-        p.u16((cx         ) << 4);                // X in 12.4 fixed point
-        p.u16((cy - half_h) << 4);                // Y in 12.4 fixed point
-        p.f32(1.0);                                            // Z
-        p.f32(1.0);                                            // 1/W
-        p.f32(1.0);                                            // Varying 0 (Red)
-        p.f32(0.0);                                            // Varying 1 (Green)
-        p.f32(0.0);                                            // Varying 2 (Blue)
+        p.u16((cx         ) << 4);          // X in 12.4 fixed point
+        p.u16((cy - half_h) << 4);          // Y in 12.4 fixed point
+        p.f32(1.0); p.f32(1.0);             // Z; 1/W
+        p.f32(1.0); p.f32(0.0); p.f32(0.0); // Varying RGB
 
         // Vertex: bottom left, vary blue
-        p.u16((cx - half_w) << 4);                // X in 12.4 fixed point
-        p.u16((cy + half_h) << 4);                // Y in 12.4 fixed point
-        p.f32(1.0);                                            // Z
-        p.f32(1.0);                                            // 1/W
-        p.f32(0.0);                                            // Varying 0 (Red)
-        p.f32(0.0);                                            // Varying 1 (Green)
-        p.f32(1.0);                                            // Varying 2 (Blue)
+        p.u16((cx - half_w) << 4);          // X in 12.4 fixed point
+        p.u16((cy + half_h) << 4);          // Y in 12.4 fixed point
+        p.f32(1.0); p.f32(1.0);             // Z; 1/W
+        p.f32(0.0); p.f32(0.0); p.f32(1.0); // Varying RGB
 
         // Vertex: bottom right, vary green
         p.u16((cx + half_w) << 4);                // X in 12.4 fixed point
         p.u16((cy + half_h) << 4);                // Y in 12.4 fixed point
-        p.f32(1.0);                                            // Z
-        p.f32(1.0);                                            // 1/W
-        p.f32(0.0);                                            // Varying 0 (Red)
-        p.f32(1.0);                                            // Varying 1 (Green)
-        p.f32(0.0);                                            // Varying 2 (Blue)
+        p.f32(1.0); p.f32(1.0);             // Z; 1/W
+        p.f32(0.0); p.f32(1.0); p.f32(0.0); // Varying RGB
 
-
-        // Setup triangle vertices from OpenGL tutorial which used this
-        // fQuad[0] = -0.2f; fQuad[1] = -0.1f; fQuad[2] = 0.0f;
-        // fQuad[3] = -0.2f; fQuad[4] = -0.6f; fQuad[5] = 0.0f;
-        // fQuad[6] = 0.2f; fQuad[7] = -0.1f; fQuad[8] = 0.0f;
-        // fQuad[9] = 0.2f; fQuad[10] = -0.6f; fQuad[11] = 0.0f;
+        // Setup triangle vertices (for quad) from OpenGL tutorial which used this
+        // [0] = -0.2; [ 1] = -0.1; [ 2] = 0.0;
+        // [3] = -0.2; [ 4] = -0.6; [ 5] = 0.0;
+        // [6] =  0.2; [ 7] = -0.1; [ 8] = 0.0;
+        // [9] =  0.2; [10] = -0.6; [11] = 0.0;
         let cy = (1.35 * (render_h as f32 / 2.0)) as u16;
 
         // Vertex: Top, left  vary blue
-        p.u16((cx - half_w) << 4);                // X in 12.4 fixed point
-        p.u16((cy - half_h) << 4);                // Y in 12.4 fixed point
-        p.f32(1.0);                                            // Z
-        p.f32(1.0);                                            // 1/W
-        p.f32(0.0);                                            // Varying 0 (Red)
-        p.f32(0.0);                                            // Varying 1 (Green)
-        p.f32(1.0);                                            // Varying 2 (Blue)
+        p.u16((cx - half_w) << 4);          // X in 12.4 fixed point
+        p.u16((cy - half_h) << 4);          // Y in 12.4 fixed point
+        p.f32(1.0); p.f32(1.0);             // Z; 1/W
+        p.f32(0.0); p.f32(0.0); p.f32(1.0); // Varying RGB
 
         // Vertex: bottom left, vary Green
-        p.u16((cx - half_w) << 4);                // X in 12.4 fixed point
-        p.u16((cy + half_h) << 4);                // Y in 12.4 fixed point
-        p.f32(1.0);                                            // Z
-        p.f32(1.0);                                            // 1/W
-        p.f32(0.0);                                            // Varying 0 (Red)
-        p.f32(1.0);                                            // Varying 1 (Green)
-        p.f32(0.0);                                            // Varying 2 (Blue)
+        p.u16((cx - half_w) << 4);          // X in 12.4 fixed point
+        p.u16((cy + half_h) << 4);          // Y in 12.4 fixed point
+        p.f32(1.0); p.f32(1.0);             // Z; 1/W
+        p.f32(0.0); p.f32(1.0); p.f32(0.0); // Varying RGB
 
         // Vertex: top right, vary red
-        p.u16((cx + half_w) << 4);                // X in 12.4 fixed point
-        p.u16((cy - half_h) << 4);                // Y in 12.4 fixed point
-        p.f32(1.0);                                            // Z
-        p.f32(1.0);                                            // 1/W
-        p.f32(1.0);                                            // Varying 0 (Red)
-        p.f32(0.0);                                            // Varying 1 (Green)
-        p.f32(0.0);                                            // Varying 2 (Blue)
+        p.u16((cx + half_w) << 4);          // X in 12.4 fixed point
+        p.u16((cy - half_h) << 4);          // Y in 12.4 fixed point
+        p.f32(1.0); p.f32(1.0);             // Z; 1/W
+        p.f32(1.0); p.f32(0.0); p.f32(0.0); // Varying RGB
 
         // Vertex: bottom right, vary yellow
-        p.u16((cx + half_w) << 4);                // X in 12.4 fixed point
-        p.u16((cy + half_h) << 4);                // Y in 12.4 fixed point
-        p.f32(1.0);                                            // Z
-        p.f32(1.0);                                            // 1/W
-        p.f32(0.0);                                            // Varying 0 (Red)
-        p.f32(1.0);                                            // Varying 1 (Green)
-        p.f32(1.0);                                            // Varying 2 (Blue)
+        p.u16((cx + half_w) << 4);          // X in 12.4 fixed point
+        p.u16((cy + half_h) << 4);          // Y in 12.4 fixed point
+        p.f32(1.0); p.f32(1.0);             // Z; 1/W
+        p.f32(0.0); p.f32(1.0); p.f32(1.0); // Varying RGB
     }
 
     // Vertex list

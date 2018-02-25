@@ -49,14 +49,29 @@ impl MiniUart {
     ///
     /// By default, reads will never time out. To set a read timeout, use
     /// `set_read_timeout()`.
-    pub fn new() -> MiniUart {
+    pub fn new() -> Self {
         let registers = unsafe {
             // Enable the mini UART as an auxiliary device.
             (*AUX_ENABLES).or_mask(1);
             &mut *(MU_REG_BASE as *mut Registers)
         };
-
         // FIXME: Implement remaining mini UART initialization.
+
+        // setting data size to 8 bits && DLAB=1
+        registers.LCR.write(0b11 | 1 << 7);
+
+        // baud rate 115200
+        registers.BAUD.write(270);
+
+
+        // 14/15 -> txd1/rdxd1
+        for &pin in &[14, 15] {
+            let mut pin = Gpio::new(pin).into_alt(gpio::Function::Alt0);
+        }
+
+        /*Self {
+            registers, timeout: None,
+        }*/
         unimplemented!()
     }
 

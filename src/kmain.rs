@@ -95,13 +95,18 @@ pub extern "C" fn kernel_main() -> ! {
     println!("    ./ \\.");
     println!("");
 
+    unsafe {
+        let f: u32 = (1 << 0) | (1 << 1) | (1 << 2);
+        asm!("msr cntv_ctl_el0, $0" : : "r"(f) : : "volatile");
+    }
+
     let s = String::from("fucking string!");
 
     println!("Hello Rust Kernel world! 0x{:X} {}", 0xDEAD, s);
 
     unsafe {
         // initialize EMMC and detect SD card type
-        if sdn::sd_init() == 0  {
+        if false && sdn::sd_init() == 0  {
             // read the master boot record after our bss segment
             let p = 0x00F0_0000 as *mut u8;
             let len = sdn::sd_readblock(0, p, 1) as usize;
@@ -125,6 +130,8 @@ pub extern "C" fn kernel_main() -> ! {
             mmu::init();
         }
 
+        println!("enabled mmu");
+
         if false {
             use volatile::*;
             // generate a Data Abort with a bad address access
@@ -132,12 +139,14 @@ pub extern "C" fn kernel_main() -> ! {
             unsafe { (*r).write(1) }
         }
 
-        const KERNEL_UART0: usize = 0xFFFFFF80_3F201000;
+        if false {
+            const KERNEL_UART0: usize = 0xFFFFFF80_3F201000;
 
-        let s = format!("fuck {:016X}\n", KERNEL_UART0);
-        let mut uart = unsafe { pi::uart0::Uart0::from_addr(KERNEL_UART0) };
-        for c in s.chars() {
-            uart.send(c as u8);
+            let s = format!("fuck {:016X}\n", KERNEL_UART0);
+            let mut uart = unsafe { pi::uart0::Uart0::from_addr(KERNEL_UART0) };
+            for c in s.chars() {
+                uart.send(c as u8);
+            }
         }
     }
 
