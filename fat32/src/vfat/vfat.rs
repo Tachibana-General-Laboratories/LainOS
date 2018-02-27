@@ -78,8 +78,6 @@ impl VFat {
         self.read_cluster(cluster, 0, buf)
     }
 
-    // TODO: The following methods may be useful here:
-
     /// A method to read from an offset of a cluster into a buffer.
     fn read_cluster(&mut self, cluster: Cluster, offset: usize, buf: &mut [u8]) -> io::Result<usize> {
         assert_eq!(offset, 0, "unimpl");
@@ -87,6 +85,7 @@ impl VFat {
 
         let from_start = ((cluster.to64() - 2) * self.sectors_per_cluster as u64);
         let sector = self.data_start_sector as u64 + from_start;
+
 
         self.device.read_sector(sector, buf)
     }
@@ -129,9 +128,9 @@ impl VFat {
 }
 
 impl<'a> FileSystem for &'a Shared<VFat> {
-    type File = ::traits::Dummy;
-    type Dir = ::traits::Dummy;
-    type Entry = ::traits::Dummy;
+    type File = File;
+    type Dir = Dir;
+    type Entry = Entry;
 
     fn open<P: AsRef<Path>>(self, path: P) -> io::Result<Self::Entry> {
         unimplemented!("FileSystem::open()")

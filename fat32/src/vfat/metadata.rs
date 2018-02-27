@@ -10,7 +10,7 @@ pub struct Date(u16);
 /// Time as represented in FAT32 on-disk structures.
 #[repr(C, packed)]
 #[derive(Default, Debug, Copy, Clone, PartialEq, Eq)]
-pub struct Time(u16);
+pub struct Time(pub u16);
 
 /// File attributes as represented in FAT32 on-disk structures.
 #[repr(C, packed)]
@@ -78,7 +78,6 @@ impl traits::Timestamp for Timestamp {
     }
 }
 
-// FIXME: Implement `traits::Metadata` for `Metadata`.
 impl traits::Metadata for Metadata {
     type Timestamp = Timestamp;
 

@@ -8,6 +8,8 @@ members = [
 	"volatile",
 	"std",
 	"vc4",
+	"xmodem",
+	"fat32",
 ]
 
 [dependencies]

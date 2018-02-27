@@ -10,22 +10,24 @@ use vfat::{Metadata, Attributes, Timestamp, Time, Date};
 
 #[derive(Debug)]
 pub struct Dir {
-    // FIXME: Fill me in.
-    name: String,
+    pub name: String,
+    pub meta: Metadata,
+    pub vfat: Shared<VFat>,
+    pub cluster: Cluster,
+    pub size: u64,
 }
 
 #[repr(C, packed)]
 #[derive(Copy, Clone, Debug)]
 pub struct VFatRegularDirEntry {
-    // FIXME: Fill me in.
-    pub name: [u8; 8],
-    pub ext: [u8; 3],
+    name: [u8; 8],
+    ext: [u8; 3],
     attributes: Attributes,
     _reserved_nt: u8,
     _creat: u8,
     create_time: Time,
     create_date: Date,
-    last_access_date: u16,
+    last_access_date: Date,
     access_rights: u16,
     mod_time: Time,
     mod_date: Date,
@@ -37,13 +39,13 @@ pub struct VFatRegularDirEntry {
 #[derive(Copy, Clone)]
 pub struct VFatLfnDirEntry {
     seq: u8,
-    pub name0: [u16; 5],
+    name0: [u16; 5],
     attributes: Attributes,
     _type: u8,
     checksum: u8,
-    pub name1: [u16; 6],
+    name1: [u16; 6],
     _zero: u16,
-    pub name2: [u16; 2],
+    name2: [u16; 2],
 }
 
 #[repr(C, packed)]
@@ -52,15 +54,16 @@ pub struct VFatUnknownDirEntry {
     pub stub: [u8; 32],
 }
 
+#[derive(Copy, Clone)]
 pub union VFatDirEntry {
     unknown: VFatUnknownDirEntry,
-    pub regular: VFatRegularDirEntry,
-    pub long_filename: VFatLfnDirEntry,
+    regular: VFatRegularDirEntry,
+    long_filename: VFatLfnDirEntry,
 }
 
 impl VFatDirEntry {
     fn and_end(&self) -> Option<&Self> {
-        if unsafe { self.unknown.stub[0] == 0 } {
+        if unsafe { self.unknown.stub[0] != 0 } {
             Some(self)
         } else {
             None
@@ -75,17 +78,48 @@ impl VFatDirEntry {
     pub fn is_long(&self) -> bool {
         unsafe { self.unknown.stub[11] == 0x0F }
     }
-    pub fn long_name<'a>(&'a self) -> impl Iterator<Item=char> + 'a {
-        unsafe {
-        use std::char::{decode_utf16, REPLACEMENT_CHARACTER};
-        let name0 = self.long_filename.name0.iter().cloned();
-        let name1 = self.long_filename.name1.iter().cloned();
-        let name2 = self.long_filename.name2.iter().cloned();
-        decode_utf16(name0)
-            .chain(decode_utf16(name1))
-            .chain(decode_utf16(name2))
-            .map(|r| r.unwrap_or(REPLACEMENT_CHARACTER))
+
+    pub fn cluster(&self) -> Cluster {
+        unsafe { Cluster::from(self.regular.start as u32) }
+    }
+
+    pub fn size(&self) -> u64 {
+        unsafe { self.regular.start as u64 }
+    }
+
+    pub fn meta(&self) -> Metadata {
+        let regular = unsafe { &self.regular };
+        let attributes = regular.attributes;
+        let created = Timestamp {
+            time: regular.create_time,
+            date: regular.create_date,
+        };
+        let modified = Timestamp {
+            time: regular.mod_time,
+            date: regular.mod_date,
+        };
+        let accessed = Timestamp {
+            time: Time(0),
+            date: regular.last_access_date,
+        };
+
+        Metadata {
+            attributes,
+            created,
+            accessed,
+            modified,
         }
+    }
+
+    pub fn long_name<'a>(&'a self) -> impl Iterator<Item=char> + 'a {
+        use std::char::{decode_utf16, REPLACEMENT_CHARACTER};
+        let name0 = decode_utf16(unsafe { self.long_filename.name0.iter().cloned() });
+        let name1 = decode_utf16(unsafe { self.long_filename.name1.iter().cloned() });
+        let name2 = decode_utf16(unsafe { self.long_filename.name2.iter().cloned() });
+        name0.chain(name1).chain(name2)
+            //.map(|r| r.unwrap_or(REPLACEMENT_CHARACTER))
+            .filter_map(|r| r.ok())
+            .filter(|&r| r != '\u{0}' && r != '\u{ffff}')
     }
     pub fn short_name(&self) -> Result<&str, ::std::str::Utf8Error> {
         use std::str::from_utf8;
@@ -116,47 +150,113 @@ impl Dir {
     pub fn find<P: AsRef<OsStr>>(&self, name: P) -> io::Result<Entry> {
         unimplemented!("Dir::find()")
     }
-}
 
-// FIXME: Implement `trait::Dir` for `Dir`.
+    pub fn root(vfat: Shared<VFat>) -> Self {
+        let cluster = vfat.borrow().root_dir_cluster;
 
-pub struct DirIter<'a> {
-    entries: ::std::slice::Iter<'a, VFatDirEntry>,
-    name: String,
-}
-
-impl<'a> DirIter<'a> {
-    pub fn new(entries: &'a [VFatDirEntry]) -> Self {
         Self {
-            entries: entries.into_iter(),
-            name:  String::with_capacity(256),
+            name: "".to_string(),
+            meta: unsafe { ::std::mem::zeroed() },
+            vfat,
+            cluster,
+            size: 0,
         }
     }
 }
 
-impl<'a> Iterator for DirIter<'a> {
-    type Item = String;
+impl traits::Dir for Dir {
+    type Entry = Entry;
+    type Iter = DirIter;
+
+    /// Returns an interator over the entries in this directory.
+    fn entries(&self) -> io::Result<Self::Iter> {
+        DirIter::new(self.vfat.clone(), self.cluster)
+    }
+}
+
+pub struct DirIter {
+    entries: Vec<u8>,
+    vfat: Shared<VFat>,
+    current: usize,
+    name: String,
+}
+
+impl DirIter {
+    pub fn new(vfat: Shared<VFat>, cluster: Cluster) -> io::Result<Self> {
+        let entries = {
+            let mut entries = Vec::new();
+            let mut vfat = vfat.borrow_mut();
+            vfat.read_chain(cluster, &mut entries)?;
+            entries
+        };
+
+        Ok(Self {
+            entries,
+            vfat,
+            name:  String::with_capacity(256),
+            current: 0,
+        })
+    }
+
+    fn next_dir_entry(&mut self) -> Option<&VFatDirEntry> {
+        if self.current < self.entries.len()  {
+            Some(unsafe {
+                let p = self.entries.as_ptr() as *const VFatDirEntry;
+                &*(p.offset(self.current as isize))
+            })
+        } else {
+            None
+        }
+    }
+}
+
+impl Iterator for DirIter {
+    type Item = Entry;
     fn next(&mut self) -> Option<Self::Item> {
         loop {
-            let e = self.entries.next()
-                .and_then(VFatDirEntry::and_end)?;
+            let e = *self.next_dir_entry().and_then(VFatDirEntry::and_end)?;
+            self.current += 1;
+
             if e.is_unused() {
                 continue;
             }
             if e.is_long() {
-                self.name.extend(e.long_name());
+                let s: String = e.long_name().collect();
+                self.name = s + &self.name;
                 continue;
             }
 
             if self.name.is_empty() {
                 self.name.extend(e.short_name().unwrap().chars());
-                self.name.push('.');
-                self.name.extend(e.short_ext().unwrap().chars());
+                let ext: Vec<_> = e.short_ext().unwrap().chars().collect();
+                if !ext.is_empty() {
+                    self.name.push('.');
+                    self.name.extend(ext);
+                }
             }
 
             let name = self.name.clone();
             self.name.clear();
-            return Some(name);
+
+            let meta = e.meta();
+            let e = if meta.attributes.directory() {
+                Entry::Dir(Dir {
+                    name,
+                    meta,
+                    vfat: self.vfat.clone(),
+                    size: e.size(),
+                    cluster: e.cluster(),
+                })
+            } else {
+                Entry::File(File {
+                    name,
+                    meta,
+                    vfat: self.vfat.clone(),
+                    size: e.size(),
+                    cluster: e.cluster(),
+                })
+            };
+            return Some(e);
         }
     }
 }
