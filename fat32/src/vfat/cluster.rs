@@ -10,3 +10,9 @@ impl From<u32> for Cluster {
 }
 
 // TODO: Implement any useful helper methods on `Cluster`.
+impl Cluster {
+    pub fn to64(self) -> u64 { self.0 as u64 }
+    pub fn fat_offset(self) -> u64 {
+        4 * self.0 as u64
+    }
+}

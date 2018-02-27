@@ -11,12 +11,12 @@ pub struct CHS {
 #[repr(C, packed)]
 #[derive(Debug, Clone)]
 pub struct PartitionEntry {
-    boot_indicator: u8,
-    starting: CHS,
-    ptype: u8, // 0xB or 0xC
-    ending: CHS,
+    pub boot_indicator: u8,
+    pub starting: CHS,
+    pub ptype: u8, // 0xB or 0xC
+    pub ending: CHS,
     pub relative_sector: u32,
-    total_sectors: u32,
+    pub total_sectors: u32,
 }
 
 /// The master boot record (MBR).

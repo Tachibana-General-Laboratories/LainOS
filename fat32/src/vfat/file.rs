@@ -7,6 +7,7 @@ use vfat::{VFat, Shared, Cluster, Metadata};
 #[derive(Debug)]
 pub struct File {
     // FIXME: Fill me in.
+    name: String,
 }
 
 // FIXME: Implement `traits::File` (and its supertraits) for `File`.

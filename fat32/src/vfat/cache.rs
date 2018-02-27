@@ -16,7 +16,7 @@ pub struct CachedDevice {
 
 impl CachedDevice {
     /// Creates a new `CachedDevice` that transparently caches sectors from
-    /// `device`. All reads and writes from `CacheDevice` are performed on
+    /// `device`. All reads and writes from `CachedDevice` are performed on
     /// in-memory caches.
     pub fn new<T: BlockDevice + 'static>(device: T) -> Self {
         Self {
@@ -39,20 +39,13 @@ impl CachedDevice {
         use std::collections::hash_map::Entry;
         let entry = match self.cache.entry(sector) {
             Entry::Occupied(mut entry) => {
-                {
-                    let e = entry.get_mut();
-                    if e.dirty {
-                        e.data.clear();
-                        self.device.read_all_sector(sector, &mut e.data)?;
-                        e.dirty = false;
-                    }
-                }
+                entry.get_mut().dirty = true;
                 entry.into_mut()
             }
             Entry::Vacant(entry) => {
                 let mut data = Vec::with_capacity(self.device.sector_size() as usize);
                 self.device.read_all_sector(sector, &mut data)?;
-                entry.insert(CacheEntry { data, dirty: false })
+                entry.insert(CacheEntry { data, dirty: true })
             }
         };
         Ok(&mut entry.data)
@@ -78,21 +71,33 @@ impl CachedDevice {
         };
         Ok(&entry.data)
     }
+
+    pub fn flush(&mut self) -> io::Result<()> {
+        for (&sector, entry) in self.cache.iter_mut().filter(|e| e.1.dirty) {
+            self.device.write_sector(sector, &entry.data)?;
+            entry.dirty = false;
+        }
+        Ok(())
+    }
 }
 
-// FIXME: Implement `BlockDevice` for `CacheDevice`.
-/*
-impl BlockDevice for CacheDevice {
+impl BlockDevice for CachedDevice {
+    fn sector_size(&self) -> u64 {
+        self.device.sector_size()
+    }
     fn read_sector(&mut self, n: u64, buf: &mut [u8]) -> io::Result<usize> {
-        (*self).read_sector(n, buf)
+        let sector = self.get(n)?;
+        let len = buf.len().min(sector.len());
+        buf[..len].copy_from_slice(&sector[..len]);
+        Ok(len)
     }
-
     fn write_sector(&mut self, n: u64, buf: &[u8]) -> io::Result<usize> {
-        (*self).write_sector(n, buf)
+        let sector = self.get_mut(n)?;
+        let len = buf.len().min(sector.len());
+        sector[..len].copy_from_slice(&buf[..len]);
+        Ok(len)
     }
 }
-*/
-
 
 impl fmt::Debug for CachedDevice {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

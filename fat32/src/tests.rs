@@ -77,3 +77,47 @@ fn shared_fs_is_sync_send_static() {
     fn f<T: Sync + Send + 'static>() {  }
     f::<Shared<VFat>>();
 }
+
+#[test]
+fn read_vfat() {
+    use std::fs::File;
+    let mut device = File::open("../fs.img").unwrap();
+    let vfat = VFat::from(device).unwrap();
+    println!("{:#?}", vfat);
+    let mut buf = vec![0; 512];
+    let mut vfat = vfat.borrow_mut();
+    vfat.read_root_dir_cluster(&mut buf[..]);
+
+    println!("{:?}", buf);
+
+    use vfat::dir::*;
+    for e in buf.chunks(32) {
+        let mut chunk = [0u8; 32];
+        chunk[..].copy_from_slice(e);
+
+        let e: VFatRegularDirEntry = unsafe { ::std::mem::transmute(chunk) };
+        let filter: &[_] = &['\0', ' '];
+        let name = ::std::str::from_utf8(&e.name[..]).unwrap().trim_right_matches(filter);
+        let ext = ::std::str::from_utf8(&e.ext[..]).unwrap().trim_right_matches(filter);
+        println!("{}.{}:::{:?}", name, ext, e);
+    }
+
+    let mut file = Vec::new();
+    vfat.read_chain(Cluster::from(3), &mut file).unwrap();
+    let file = ::std::str::from_utf8(&file).unwrap().trim_right_matches('\0');
+    println!("{}", file);
+
+    // readdir
+    let mut dir = Vec::new();
+    let cluster = vfat.root_dir_cluster;
+    vfat.read_chain(cluster, &mut dir).unwrap();
+
+    let entries: &[VFatDirEntry] = unsafe {
+        let p = dir.as_ptr() as *const VFatDirEntry;
+        ::std::slice::from_raw_parts(p, dir.len() / 4)
+    };
+
+    for name in DirIter::new(entries) {
+        println!("{}", name);
+    }
+}

@@ -25,15 +25,25 @@ pub struct FatEntry(pub u32);
 impl FatEntry {
     /// Returns the `Status` of the FAT entry `self`.
     pub fn status(&self) -> Status {
-        unimplemented!("FatEntry::status()")
+        let v = self.0 & 0x0FFFF_FFFF;
+        match v {
+            0x000_0000 => Free,
+            0x000_0001 => Reserved,
+            0x000_0002...0xFFF_FFEF => Data(Cluster::from(v)),
+            0xFFF_FFF0...0xFFF_FFF5 => Reserved,
+            0xFFF_FFF6 => Reserved,
+            0xFFF_FFF7 => Bad,
+            0xFFF_FFF8...0xFFF_FFFF => Eoc(v),
+            _ => unreachable!(),
+        }
     }
 }
 
 impl fmt::Debug for FatEntry {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.debug_struct("FatEntry")
-            .field("value", &self.0)
-            .field("status", &self.status())
+        f.debug_tuple("FatEntry")
+            .field(&self.0)
+            .field(&self.status())
             .finish()
     }
 }

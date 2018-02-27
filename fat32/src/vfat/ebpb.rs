@@ -5,22 +5,37 @@ use vfat::Error;
 
 #[repr(C, packed)]
 pub struct BiosParameterBlock {
-    bpb: [u8; 36],
-    sec: u32,
-    flags: u16,
-    version: u16,
-    root: u32,
-    fs_info: u16,
-    boot_backup: u16,
-    _reserved: [u8; 12],
-    drive: u8,
-    _reserved_nt: u8,
-    sign: u8,
-    volid: u32,
-    label: [u8; 11],
-    sysid: [u8; 8],
-    boot: [u8; 420],
-    signature: [u8; 2],
+    pub ebxx90: [u8; 3],
+    pub oem: [u8; 8],
+    pub bytes_per_sector: u16,
+    pub sectors_per_cluster: u8,
+    pub num_reserved_sectors: u16,
+    pub num_of_fats: u8,
+    pub max_dir_entries: u16,
+    pub total_logical_sectors: u16,
+    pub fat_id: u8,
+    pub num_sectors_per_fat: u16,
+    pub num_sectors_per_track: u16,
+    pub num_hs: u16,
+    pub num_hidden_sectors: u32,
+    pub total_sectors: u32,
+
+    // ebpb
+    pub sectors_per_fat: u32,
+    pub flags: u16,
+    pub version: u16,
+    pub root_dir_cluster: u32,
+    pub fs_info: u16,
+    pub boot_backup: u16,
+    pub _reserved: [u8; 12],
+    pub drive: u8,
+    pub _reserved_nt: u8,
+    pub sign: u8,
+    pub volid: u32,
+    pub label: [u8; 11],
+    pub sysid: [u8; 8],
+    pub boot: [u8; 420],
+    pub signature: [u8; 2],
 }
 
 impl BiosParameterBlock {
@@ -51,7 +66,10 @@ impl BiosParameterBlock {
 }
 
 impl fmt::Debug for BiosParameterBlock {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        unimplemented!("BiosParameterBlock::debug()")
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        fmt.debug_struct("eBPB")
+            .field("sectors_per_fat", &self.sectors_per_fat)
+            .finish()
     }
 }
+
