@@ -9,8 +9,22 @@ pub enum Entry {
 }
 
 // TODO: Implement any useful helper methods on `Entry`.
+impl Entry {
+    fn cluster(&self) -> Cluster {
+        match self {
+            &Entry::File(ref e) => e.cluster,
+            &Entry::Dir(ref e) => e.cluster,
+        }
+    }
 
-// FIXME: Implement `traits::Entry` for `Entry`.
+    fn size(&self) -> u64 {
+        match self {
+            &Entry::File(ref e) => e.size,
+            &Entry::Dir(ref e) => e.size,
+        }
+    }
+}
+
 impl traits::Entry for Entry {
     type File = File;
     type Dir = Dir;

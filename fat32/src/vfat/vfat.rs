@@ -6,7 +6,7 @@ use std::cmp::min;
 use util::SliceExt;
 use mbr::MasterBootRecord;
 use vfat::{Shared, Cluster, File, Dir, Entry, FatEntry, Error, Status};
-use vfat::{BiosParameterBlock, CachedDevice};
+use vfat::{BiosParameterBlock, CachedDevice, Partition};
 use traits::{FileSystem, BlockDevice};
 
 #[derive(Debug)]
@@ -41,35 +41,17 @@ impl VFat {
         let fat_start_sector = num_reserved_sectors as u64;
         let data_start_sector = fat_start_sector + num_of_fats as u64 * sectors_per_fat as u64; //unimplemented!();
 
-        println!("fat_start_sector: {:X} -> {:X}", fat_start_sector, fat_start_sector * 512);
-        println!("data_start _sector: {:X} -> {:X}", data_start_sector, data_start_sector * 512);
-
-        let mut s = Vec::new();
-        device.read_all_sector(fat_start_sector, &mut s);
-
-        for e in s.chunks(4).take(10) {
-            let e =
-                e[0] as u32 >> 0 |
-                e[1] as u32 >> 8 |
-                e[2] as u32 >> 16 |
-                e[3] as u32 >> 24;
-
-            let e = FatEntry(e as u32);
-            println!("{:?}", e);
-        }
-
-        let root_dir_cluster = Cluster::from(root_dir_cluster);
-
-        let device = CachedDevice::new(device);
-        //unimplemented!("VFat::from()")
         Ok(Shared::new(Self {
-            device,
             bytes_per_sector,
             sectors_per_cluster,
             sectors_per_fat,
             fat_start_sector,
             data_start_sector,
-            root_dir_cluster,
+            root_dir_cluster: Cluster::from(root_dir_cluster),
+            device: CachedDevice::new(device, Partition {
+                start: 0,
+                sector_size: 512,
+            }),
         }))
     }
 

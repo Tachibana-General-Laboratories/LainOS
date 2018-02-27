@@ -89,7 +89,6 @@ fn check_mbr_boot_indicator() {
 }
 
 #[test]
-#[ignore]
 fn test_mbr() {
     let mut mbr = resource!("mbr.img");
     let mut data = [0u8; 512];
@@ -114,7 +113,6 @@ fn check_ebpb_signature() {
 }
 
 #[test]
-#[ignore]
 fn test_ebpb() {
     let mut ebpb1 = resource!("ebpb1.img");
     let mut ebpb2 = resource!("ebpb2.img");
@@ -136,7 +134,6 @@ fn check_entry_sizes() {
 }
 
 #[test]
-#[ignore]
 fn test_vfat_init() {
     vfat_from_resource!("mock1.fat32.img");
     vfat_from_resource!("mock2.fat32.img");
@@ -353,7 +350,7 @@ fn read_vfat() {
     println!("FUCK THIS SHIT:");
     for e in root.entries().unwrap() {
         if let Some(e) = e.as_file() {
-            println!("FILE: {} {}", e.name, e.meta);
+            println!("FILE[{}]: {} {}", e.size(), e.name, e.meta);
         }
         if let Some(e) = e.as_dir() {
             println!(" DIR: {} {}", e.name, e.meta);

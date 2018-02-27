@@ -3,6 +3,13 @@ use std::collections::HashMap;
 
 use traits::BlockDevice;
 
+pub struct Partition {
+    /// The physical sector where the partition begins.
+    pub start: u64,
+    /// The size, in bytes, of a logical sector in the partition.
+    pub sector_size: u64
+}
+
 #[derive(Debug)]
 struct CacheEntry {
     data: Vec<u8>,
@@ -12,16 +19,54 @@ struct CacheEntry {
 pub struct CachedDevice {
     device: Box<BlockDevice>,
     cache: HashMap<u64, CacheEntry>,
+    partition: Partition,
 }
 
 impl CachedDevice {
     /// Creates a new `CachedDevice` that transparently caches sectors from
-    /// `device`. All reads and writes from `CachedDevice` are performed on
+    /// `device` and maps physical sectors to logical sectors inside of
+    /// `partition`. All reads and writes from `CacheDevice` are performed on
     /// in-memory caches.
-    pub fn new<T: BlockDevice + 'static>(device: T) -> Self {
+    ///
+    /// The `partition` parameter determines the size of a logical sector and
+    /// where logical sectors begin. An access to a sector `n` _before_
+    /// `partition.start` is made to physical sector `n`. Cached sectors before
+    /// `partition.start` are the size of a physical sector. An access to a
+    /// sector `n` at or after `partition.start` is made to the _logical_ sector
+    /// `n - partition.start`. Cached sectors at or after `partition.start` are
+    /// the size of a logical sector, `partition.sector_size`.
+    ///
+    /// `partition.sector_size` must be an integer multiple of
+    /// `device.sector_size()`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the partition's sector size is < the device's sector size.
+    pub fn new<T>(device: T, partition: Partition) -> Self
+        where T: BlockDevice + 'static
+    {
+        assert!(partition.sector_size >= device.sector_size());
+
         Self {
             device: Box::new(device),
-            cache: HashMap::new()
+            cache: HashMap::new(),
+            partition: partition
+        }
+    }
+
+    /// Maps a user's request for a sector `virt` to the physical sector and
+    /// number of physical sectors required to access `virt`.
+    fn virtual_to_physical(&self, virt: u64) -> (u64, u64) {
+        if self.device.sector_size() == self.partition.sector_size {
+            (virt, 1)
+        } else if virt < self.partition.start {
+            (virt, 1)
+        } else {
+            let factor = self.partition.sector_size / self.device.sector_size();
+            let logical_offset = virt - self.partition.start;
+            let physical_offset = logical_offset * factor;
+            let physical_sector = self.partition.start + physical_offset;
+            (physical_sector, factor)
         }
     }
 

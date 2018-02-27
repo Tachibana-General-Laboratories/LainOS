@@ -28,10 +28,10 @@ pub struct VFatRegularDirEntry {
     create_time: Time,
     create_date: Date,
     last_access_date: Date,
-    access_rights: u16,
+    hi_cluster: u16,
     mod_time: Time,
     mod_date: Date,
-    start: u16,
+    lo_cluster: u16,
     size: u32,
 }
 
@@ -80,11 +80,15 @@ impl VFatDirEntry {
     }
 
     pub fn cluster(&self) -> Cluster {
-        unsafe { Cluster::from(self.regular.start as u32) }
+        unsafe {
+            let lo = self.regular.lo_cluster as u32;
+            let hi = self.regular.hi_cluster as u32;
+            Cluster::from(lo | hi << 16)
+        }
     }
 
     pub fn size(&self) -> u64 {
-        unsafe { self.regular.start as u64 }
+        unsafe { self.regular.size as u64 }
     }
 
     pub fn meta(&self) -> Metadata {
@@ -148,12 +152,23 @@ impl Dir {
     /// If `name` contains invalid UTF-8 characters, an error of `InvalidInput`
     /// is returned.
     pub fn find<P: AsRef<OsStr>>(&self, name: P) -> io::Result<Entry> {
-        unimplemented!("Dir::find()")
+        use traits::*;
+
+        if let Some(name) = name.as_ref().to_str() {
+            let entry = self.entries()?
+                .find(|e| e.name().eq_ignore_ascii_case(name));
+            if let Some(entry) = entry {
+                Ok(entry)
+            } else {
+                Err(io::Error::new(io::ErrorKind::NotFound, name.to_string()))
+            }
+        } else {
+            Err(io::Error::new(io::ErrorKind::InvalidInput, "fail name"))
+        }
     }
 
     pub fn root(vfat: Shared<VFat>) -> Self {
         let cluster = vfat.borrow().root_dir_cluster;
-
         Self {
             name: "".to_string(),
             meta: unsafe { ::std::mem::zeroed() },
@@ -168,9 +183,19 @@ impl traits::Dir for Dir {
     type Entry = Entry;
     type Iter = DirIter;
 
-    /// Returns an interator over the entries in this directory.
     fn entries(&self) -> io::Result<Self::Iter> {
-        DirIter::new(self.vfat.clone(), self.cluster)
+        let entries = {
+            let mut entries = Vec::new();
+            let mut vfat = self.vfat.borrow_mut();
+            vfat.read_chain(self.cluster, &mut entries)?;
+            entries
+        };
+        Ok(DirIter {
+            entries,
+            vfat: self.vfat.clone(),
+            name: String::new(),
+            current: 0,
+        })
     }
 }
 
@@ -182,22 +207,6 @@ pub struct DirIter {
 }
 
 impl DirIter {
-    pub fn new(vfat: Shared<VFat>, cluster: Cluster) -> io::Result<Self> {
-        let entries = {
-            let mut entries = Vec::new();
-            let mut vfat = vfat.borrow_mut();
-            vfat.read_chain(cluster, &mut entries)?;
-            entries
-        };
-
-        Ok(Self {
-            entries,
-            vfat,
-            name:  String::with_capacity(256),
-            current: 0,
-        })
-    }
-
     fn next_dir_entry(&mut self) -> Option<&VFatDirEntry> {
         if self.current < self.entries.len()  {
             Some(unsafe {

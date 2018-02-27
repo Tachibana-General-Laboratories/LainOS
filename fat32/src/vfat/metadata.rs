@@ -59,22 +59,22 @@ pub struct Metadata {
 
 impl traits::Timestamp for Timestamp {
     fn year(&self) -> usize {
-        1980 + (self.date.0 >> 8) as usize
+        1980 + (self.date.0 >> 9) as usize
     }
     fn month(&self) -> u8 {
-        ((self.date.0 >> 4) & 0b111) as u8
+        ((self.date.0 >> 5) & 0b1111) as u8
     }
     fn day(&self) -> u8 {
-        (self.date.0 & 0b1111) as u8
+        (self.date.0 & 0b1_1111) as u8
     }
     fn hour(&self) -> u8 {
-        (self.time.0 >> 10) as u8
+        (self.time.0 >> 11) as u8
     }
     fn minute(&self) -> u8 {
-        ((self.time.0 >> 4) & 0b11111) as u8
+        ((self.time.0 >> 5) & 0b11_1111) as u8
     }
     fn second(&self) -> u8 {
-        2 * (self.time.0 & 0b1111) as u8
+        2 * (self.time.0 & 0b1_1111) as u8
     }
 }
 

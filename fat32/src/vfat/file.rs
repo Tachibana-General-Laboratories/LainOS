@@ -54,6 +54,6 @@ impl traits::File for File {
         unimplemented!()
     }
     fn size(&self) -> u64 {
-        unimplemented!()
+        self.size
     }
 }
