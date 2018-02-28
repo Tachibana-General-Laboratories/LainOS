@@ -234,7 +234,6 @@ fn hash_dir_recursive_from<P: AsRef<Path>>(vfat: Shared<VFat>, path: P) -> Strin
 }
 
 #[test]
-//#[ignore]
 fn test_all_dir_entries() {
     let hash = hash_dir_recursive_from(vfat_from_resource!("mock1.fat32.img"), "/");
     assert_hash_eq!("mock 1 all dir entries", hash, hash_for!("all-entries-1"));
@@ -302,21 +301,18 @@ fn hash_files_recursive_from<P: AsRef<Path>>(vfat: Shared<VFat>, path: P) -> Str
 }
 
 #[test]
-#[ignore]
 fn test_mock1_files_recursive() {
     let hash = hash_files_recursive_from(vfat_from_resource!("mock1.fat32.img"), "/");
     assert_hash_eq!("mock 1 file hashes", hash, hash_for!("files-1"));
 }
 
 #[test]
-#[ignore]
 fn test_mock2_files_recursive() {
     let hash = hash_files_recursive_from(vfat_from_resource!("mock2.fat32.img"), "/");
     assert_hash_eq!("mock 2 file hashes", hash, hash_for!("files-2-3"));
 }
 
 #[test]
-#[ignore]
 fn test_mock3_files_recursive() {
     let hash = hash_files_recursive_from(vfat_from_resource!("mock3.fat32.img"), "/");
     assert_hash_eq!("mock 3 file hashes", hash, hash_for!("files-2-3"));
@@ -332,7 +328,7 @@ fn shared_fs_is_sync_send_static() {
 fn read_vfat() {
     use std::fs::File;
     //let name = "../fs.img";
-    let name = "../files/resources/mock2.fat32.img";
+    let name = "../files/resources/mock3.fat32.img";
 
     let device = File::open(name).unwrap();
     let vfat = VFat::from(device).unwrap();
@@ -347,6 +343,8 @@ fn read_vfat() {
 
     use traits::*;
 
+    const TEST_READ_SIZE: bool = false;
+
     let root = ::vfat::dir::Dir::root(vfat.clone());
 
     println!("FUCK THIS SHIT:");
@@ -359,27 +357,26 @@ fn read_vfat() {
             //println!("{:?}", e.name());
             return;
         }
-        for _ in 0..level {
-            print!("----");
+        for _ in 1..level {
+            print!("    ");
         }
         if e.is_file() {
             let mut e = e.into_file().unwrap();
             println!("{} file[{}]", e.name, e.size());
-            /*
-            let mut buf = [0; 100];
-            while {
-                let n = e.read(&mut buf[..]).unwrap();
-                //println!("{}: {:?}", n, ::std::str::from_utf8(&buf[..]));
-                //println!("{}", n);
-                n == 100
-            } {}
-            */
-            //println!("end");
+            if TEST_READ_SIZE {
+                let mut buf = [0; 29];
+                let mut count = 0;
+                while {
+                    let n = e.read(&mut buf[..]).unwrap();
+                    count += n;
+                    n != 0
+                } {}
+                assert_eq!(count as u64, e.size());
+            }
         } else {
             let e = e.into_dir().unwrap();
             println!("{}/", e.name);
             for e in e.entries().unwrap() {
-                //println!("[{}] is_dir: {}", e.name(), e.is_dir());
                 pri(level + 1, e);
             }
         }

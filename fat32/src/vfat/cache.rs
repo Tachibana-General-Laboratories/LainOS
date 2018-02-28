@@ -83,16 +83,19 @@ impl CachedDevice {
     pub fn get_mut(&mut self, sector: u64) -> io::Result<&mut [u8]> {
         use std::collections::hash_map::Entry;
 
-        let (sector, _) = self.virtual_to_physical(sector);
+        let (sector, factor) = self.virtual_to_physical(sector);
 
+        let cap = self.sector_size() as usize;
         let entry = match self.cache.entry(sector) {
             Entry::Occupied(mut entry) => {
                 entry.get_mut().dirty = true;
                 entry.into_mut()
             }
             Entry::Vacant(entry) => {
-                let mut data = Vec::with_capacity(self.device.sector_size() as usize);
-                self.device.read_all_sector(sector, &mut data)?;
+                let mut data = Vec::with_capacity(cap);
+                for i in 0..factor {
+                    self.device.read_all_sector(sector + i, &mut data)?;
+                }
                 entry.insert(CacheEntry { data, dirty: true })
             }
         };
@@ -108,15 +111,18 @@ impl CachedDevice {
     pub fn get(&mut self, sector: u64) -> io::Result<&[u8]> {
         use std::collections::hash_map::Entry;
 
-        let (sector, _) = self.virtual_to_physical(sector);
+        let (sector, factor) = self.virtual_to_physical(sector);
 
+        let cap = self.sector_size() as usize;
         let entry = match self.cache.entry(sector) {
             Entry::Occupied(mut entry) => {
                 entry.into_mut()
             }
             Entry::Vacant(entry) => {
-                let mut data = Vec::with_capacity(self.device.sector_size() as usize);
-                self.device.read_all_sector(sector, &mut data)?;
+                let mut data = Vec::with_capacity(cap);
+                for i in 0..factor {
+                    self.device.read_all_sector(sector + i, &mut data)?;
+                }
                 entry.insert(CacheEntry { data, dirty: false })
             }
         };
@@ -134,7 +140,7 @@ impl CachedDevice {
 
 impl BlockDevice for CachedDevice {
     fn sector_size(&self) -> u64 {
-        self.device.sector_size()
+        self.partition.sector_size
     }
     fn read_sector(&mut self, n: u64, buf: &mut [u8]) -> io::Result<usize> {
         let sector = self.get(n)?;

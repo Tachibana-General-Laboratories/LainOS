@@ -55,11 +55,14 @@ impl io::Seek for File {
 impl io::Read for File {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         if self.position >= self.size {
-            return Ok(0)
+            Ok(0)
+        } else {
+            let mut end = ((buf.len() as u64).min(self.size - self.position)) as usize;
+            let mut vfat = self.vfat.borrow_mut();
+            let n = vfat.read_cluster(self.cluster, self.position as usize, &mut buf[..end])?;
+            self.position += n as u64;
+            Ok(n)
         }
-        let n = self.vfat.borrow_mut().read_cluster(self.cluster, self.position as usize, buf)?;
-        self.position += n as u64;
-        Ok(n)
     }
 }
 

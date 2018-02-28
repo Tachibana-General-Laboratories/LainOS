@@ -69,15 +69,11 @@ impl VFat {
     }
 
     /// A method to read from an offset of a cluster into a buffer.
-    pub fn read_cluster(&mut self, mut cluster: Cluster, offset: usize, mut buf: &mut [u8]) -> io::Result<usize> {
+    pub fn read_cluster(&mut self, mut cluster: Cluster, mut offset: usize, buf: &mut [u8]) -> io::Result<usize> {
         use vfat::Status::*;
         use std::io::{Cursor, Write};
         let bytes_per_sector = self.bytes_per_sector as usize;
 
-        let mut skip_sectors = offset / bytes_per_sector;
-        let mut offset = offset % bytes_per_sector;
-
-        let mut count = 0;
         let mut tmp = Vec::with_capacity(bytes_per_sector);
         let mut cursor = Cursor::new(buf);
 
@@ -85,21 +81,22 @@ impl VFat {
         loop {
             let sector = self.sector(cluster);
             for i in 0..self.sectors_per_cluster as u64 {
-                if skip_sectors > 0 {
-                    skip_sectors -= 1;
+                if offset >= bytes_per_sector {
+                    offset -= bytes_per_sector;
                     continue;
                 }
+
                 self.device.read_all_sector(sector + i, &mut tmp)?;
                 {
-                    let tmp = &tmp[offset..];
-                    let n = cursor.write(&tmp)?;
-                    count += n;
-                    if n == 0 {
+                    if offset >= tmp.len() {
+                        break 'end;
+                    }
+                    if cursor.write(&tmp[offset..])? == 0 {
                         break 'end;
                     }
                 }
-                offset = 0;
                 tmp.clear();
+                offset = 0;
             }
 
             match self.fat_entry(cluster)?.status() {
@@ -108,7 +105,7 @@ impl VFat {
                 _ => break,
             }
         }
-        Ok(count)
+        Ok(cursor.position() as usize)
     }
 
     /// A method to read all of the clusters chained from a starting cluster

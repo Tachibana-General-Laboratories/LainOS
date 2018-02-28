@@ -25,7 +25,7 @@ pub struct FatEntry(pub u32);
 impl FatEntry {
     /// Returns the `Status` of the FAT entry `self`.
     pub fn status(&self) -> Status {
-        let v = self.0 & 0x0FFFF_FFFF;
+        let v = self.0 & 0x0FFF_FFFF;
         match v {
             0x000_0000 => Free,
             0x000_0001 => Reserved,
