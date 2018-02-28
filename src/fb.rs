@@ -2,14 +2,64 @@ use pi::mbox;
 use std::ptr::write_volatile;
 use std::mem::transmute;
 
+struct Info {
+    width: u32,         // width of the display
+    height: u32,        // height of the display
+    virtual_width: u32, // width of the virtual framebuffer
+    virtual_height: u32,// height of the virtual framebuffer
+    pitch: u32,         // number of bytes per row
+    depth: u32,         // number of bits per pixel
+    x_offset: u32,      // x of the upper left corner of the virtual fb
+    y_offset: u32,      // y of the upper left corner of the virtual fb
+    framebuffer: u32,   // pointer to the start of the framebuffer
+    size: u32,          // number of bytes in the framebuffer
+}
+
 pub struct FrameBuffer {
     buffer: *mut u8,
     width: u32,
     height: u32,
     pitch: u32,
+
+    x_offset: u32,
+    y_offset: u32,
+
+    next: bool,
 }
 
 impl FrameBuffer {
+    pub fn new(width: u32, height: u32, depth: u32) -> Option<Self> {
+        let info = FrameBufferInfo {
+            width,
+            height,
+            virtual_width: width,
+            virtual_height: height,
+            x_offset: 0,
+            y_offset: 0,
+            depth,
+            rgb: false,
+        };
+
+        init(info)
+    }
+
+    pub fn flush(&mut self) -> bool {
+        let y = if self.next {
+            self.height
+        } else {
+            0
+        };
+        let ok = mbox::Mailbox::new().tag_message(&[
+            mbox::Tag::SET_VIRTUAL_OFFSET as u32, 8, 8, self.x_offset, y,
+        ]).is_some();
+
+        if ok {
+            self.y_offset = y;
+        }
+
+        ok
+    }
+
     pub fn width(&self) -> u32 { self.width }
     pub fn height(&self) -> u32 { self.height }
     pub fn pitch(&self) -> u32 { self.pitch }
@@ -33,18 +83,18 @@ impl FrameBuffer {
     }
 }
 
-pub struct FrameBufferInfo {
-    pub width: u32,
-    pub height: u32,
-    pub virtual_width: u32,
-    pub virtual_height: u32,
-    pub x_offset: u32,
-    pub y_offset: u32,
-    pub depth: u32,
-    pub rgb: bool,
+struct FrameBufferInfo {
+    width: u32,
+    height: u32,
+    virtual_width: u32,
+    virtual_height: u32,
+    x_offset: u32,
+    y_offset: u32,
+    depth: u32,
+    rgb: bool,
 }
 
-pub fn init(info: FrameBufferInfo) -> Option<FrameBuffer> {
+fn init(info: FrameBufferInfo) -> Option<FrameBuffer> {
     mbox::Mailbox::new().tag_message(&[
         mbox::Tag::SET_PHYSICAL_WIDTH_HEIGHT as u32, 8, 8, info.width, info.height,
         mbox::Tag::SET_VIRTUAL_WIDTH_HEIGHT as u32, 8, 8, info.virtual_width, info.virtual_height,
@@ -61,6 +111,10 @@ pub fn init(info: FrameBufferInfo) -> Option<FrameBuffer> {
                 height: buf[6],
                 pitch: buf[33],
                 buffer: addr,
+                x_offset: info.x_offset,
+                y_offset: info.y_offset,
+
+                next: false,
             })
         } else {
             None

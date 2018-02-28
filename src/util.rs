@@ -43,21 +43,21 @@ pub fn dump(mut ptr: *const u8, size: usize) {
     let count = size / 16 + (size % 16 != 0) as usize;
     for _ in 0..count {
         unsafe {
-            print!("{:08X}  ", ptr as u32);
+            kprint!("{:08X}  ", ptr as u32);
             for i in 0..16 {
-                print!("{:02X} ", *ptr.offset(i));
+                kprint!("{:02X} ", *ptr.offset(i));
                 if i == 7 {
-                    print!(" ");
+                    kprint!(" ");
                 }
             }
-            print!(" ");
+            kprint!(" ");
             for i in 0..16 {
                 match *ptr.offset(i) {
-                    c @ 32...127 => print!("{}", c as char),
-                    _ => print!("."),
+                    c @ 32...127 => kprint!("{}", c as char),
+                    _ => kprint!("."),
                 }
             }
-            println!("");
+            kprintln!("");
             ptr = ptr.offset(16);
         }
     }

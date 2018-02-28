@@ -47,7 +47,7 @@ impl<'a> Command<'a> {
 /// Starts a shell using `prefix` as the prefix for each line. This function
 /// never returns: it is perpetually in a shell loop.
 pub fn shell(prefix: &str) -> ! {
-    print!("\n{}", prefix);
+    kprint!("\n{}", prefix);
 
     let mut buf = [0u8; 512];
     let mut buf = StackVec::new(&mut buf);
@@ -55,21 +55,21 @@ pub fn shell(prefix: &str) -> ! {
         match uart0::receive() {
             0 => (),
             b'\r' | b'\n' => {
-                print!("\r\n");
+                kprint!("\r\n");
                 {
                     let s = from_utf8(&buf).unwrap();
                     let mut str_buf = [""; 64];
                     match Command::parse(s, &mut str_buf) {
                         Err(Error::Empty) => (),
-                        Err(Error::TooManyArgs) => println!("error: too many arguments"),
+                        Err(Error::TooManyArgs) => kprintln!("error: too many arguments"),
                         Ok(cmd) => {
                             run_cmd(cmd);
-                            print!("\r\n");
+                            kprint!("\r\n");
                         }
                     }
                 }
                 buf.truncate(0);
-                print!("{}", prefix);
+                kprint!("{}", prefix);
             }
             127 => (), // DEL
             8 => { // BS
@@ -97,18 +97,18 @@ fn run_cmd(cmd: Command) {
         "ls" => ls(cmd.args),
         "dump" => dump(cmd.args),
         "poweroff" => {
-            print!("power-off the machine\n");
+            kprint!("power-off the machine\n");
             power::power_off();
         }
         "halt" => {
-            print!("halt the machine\n");
+            kprint!("halt the machine\n");
             power::halt();
         }
         "reset" => {
-            print!("reset the machine\n");
+            kprint!("reset the machine\n");
             power::reset();
         }
-        _ => print!("unknown command: {}", cmd.path()),
+        _ => kprint!("unknown command: {}", cmd.path()),
     }
 }
 
@@ -116,8 +116,8 @@ fn echo<'a>(args: StackVec<'a, &'a str>) {
     for (i, arg) in args.iter().enumerate() {
         match i {
             0 => (),
-            1 => print!("{}", arg),
-            _ => print!(" {}", arg),
+            1 => kprint!("{}", arg),
+            _ => kprint!(" {}", arg),
         }
     }
 }
@@ -128,18 +128,18 @@ fn ls<'a>(args: StackVec<'a, &'a str>) {
     } else {
         ""
     };
-    println!("  no file system yet;   but... maybe {} is:", dir);
+    kprintln!("  no file system yet;   but... maybe {} is:", dir);
     match dir {
-        "/" => print!("bin etc sys usr var"),
-        _ => print!("ls: cannot access '{}': No such file or directory", dir),
+        "/" => kprint!("bin etc sys usr var"),
+        _ => kprint!("ls: cannot access '{}': No such file or directory", dir),
     }
 }
 
 
 fn dump<'a>(args: StackVec<'a, &'a str>) {
     if args.len() < 2 {
-        println!("usage:");
-        print!  ("    dump <hex addr> <size=512>");
+        kprintln!("usage:");
+        kprint!  ("    dump <hex addr> <size=512>");
         return;
     }
 

@@ -19,11 +19,11 @@ pub type c_uint = u32;
 pub type c_long = u64;
 
 fn uart_puts(s: &str) {
-    print!("{}", s);
+    kprint!("{}", s);
 }
 
 fn uart_send(s: char) {
-    print!("{}", s as u8);
+    kprint!("{}", s as u8);
 }
 
 pub enum Error {
@@ -246,18 +246,18 @@ pub unsafe fn sd_cmd(mut code: c_uint, mut arg: c_uint) -> c_int {
             sd_cmd((CMD_APP_CMD | if sd_rca != 0 { CMD_RSPNS_48 } else { 0 }) as u32,
                    sd_rca as u32) as u64;
         if sd_rca != 0 && r == 0 {
-            println!("ERROR: failed to send SD APP command");
+            kprintln!("ERROR: failed to send SD APP command");
             sd_err = SD_ERROR as u64;
             return 0;
         }
         code &= !CMD_NEED_APP;
     }
     if sd_status(SR_CMD_INHIBIT).is_err() {
-        println!("ERROR: EMMC busy");
+        kprintln!("ERROR: EMMC busy");
         sd_err = SD_TIMEOUT as u64;
         return 0;
     }
-    println!("EMMC: Sending command {:08x} arg {:08x}", code, arg);
+    kprintln!("EMMC: Sending command {:08x} arg {:08x}", code, arg);
     (*EMMC).INTERRUPT.write((*EMMC).INTERRUPT.read());
     (*EMMC).ARG1.write(arg);
     (*EMMC).CMDTM.write(code);
@@ -267,7 +267,7 @@ pub unsafe fn sd_cmd(mut code: c_uint, mut arg: c_uint) -> c_int {
         wait_msec(100);
     }
     if { r = sd_int(INT_CMD_DONE) as u64; r } != 0 {
-        println!("ERROR: failed to send EMMC command");
+        kprintln!("ERROR: failed to send EMMC command");
         sd_err = r;
         return 0;
     }
@@ -301,7 +301,7 @@ pub unsafe fn sd_readblock(mut lba: c_uint, mut buffer: *mut u8, mut num: c_uint
 
     if num < 1 { num = 1; }
 
-    println!("sd_readblock lba {:x} num {:x}", lba, num);
+    kprintln!("sd_readblock lba {:x} num {:x}", lba, num);
     if sd_status(SR_DAT_INHIBIT).is_err() { sd_err = SD_TIMEOUT as u64; return 0; }
 
     let mut buf = buffer as *mut u32;
@@ -372,7 +372,7 @@ pub unsafe fn sd_clk(mut f: c_uint) -> c_int {
     }
     if sd_hv > HOST_SPEC_V2 { d = c; } else { d = (1 << s); }
     if d <= 2 { d = 2; s = 0; }
-    println!("sd_clk divisor {:x}, shift {:x}", d, s);
+    kprintln!("sd_clk divisor {:x}, shift {:x}", d, s);
     if sd_hv > HOST_SPEC_V2 { h = (d & 768) >> 2; }
     d = (((d & 255) << 8) | h);
     (*EMMC).CONTROL1.write(((*EMMC).CONTROL1.read() & 4294901823) | d);
@@ -406,7 +406,7 @@ pub unsafe fn sd_init() -> c_int {
     let mut r: u64;
 
     sd_hv = (((*EMMC).SLOTISR_VER.read() & HOST_SPEC_NUM) >> HOST_SPEC_NUM_SHIFT) as u64;
-    println!("EMMC: GPIO set up");
+    kprintln!("EMMC: GPIO set up");
     (*EMMC).CONTROL0.write(0);
     (*EMMC).CONTROL1.or_mask(C1_SRST_HC);
     let mut cnt = 10000;
@@ -418,10 +418,10 @@ pub unsafe fn sd_init() -> c_int {
         };
     }
     if cnt <= 0 {
-        println!("ERROR: failed to reset EMMC");
+        kprintln!("ERROR: failed to reset EMMC");
         return SD_ERROR;
     }
-    println!("EMMC: reset OK");
+    kprintln!("EMMC: reset OK");
     (*EMMC).CONTROL1.or_mask((C1_CLK_INTLEN | C1_TOUNIT_MAX) as u32);
     wait_msec(10);
     if { r = sd_clk(400000) as u64; r } != 0 { return r as i32; }
@@ -443,10 +443,10 @@ pub unsafe fn sd_init() -> c_int {
         wait_cycles(400);
         r = sd_cmd(CMD_SEND_OP_COND, ACMD41_ARG_HC) as u64;
         uart_puts("EMMC: CMD_SEND_OP_COND returned ");
-        if r & ACMD41_CMD_COMPLETE != 0 { print!("COMPLETE "); }
-        if r & ACMD41_VOLTAGE != 0 { print!("VOLTAGE "); }
-        if r & ACMD41_CMD_CCS != 0 { print!("CCS "); }
-        println!("{:x}", r);
+        if r & ACMD41_CMD_COMPLETE != 0 { kprint!("COMPLETE "); }
+        if r & ACMD41_VOLTAGE != 0 { kprint!("VOLTAGE "); }
+        if r & ACMD41_CMD_CCS != 0 { kprint!("CCS "); }
+        kprintln!("{:x}", r);
         if sd_err != SD_TIMEOUT as u64 && sd_err != SD_OK as u64 {
             uart_puts("ERROR: EMMC ACMD41 returned error\n");
             return sd_err as i32;
@@ -457,7 +457,7 @@ pub unsafe fn sd_init() -> c_int {
     if r & ACMD41_CMD_CCS != 0 { ccs = SCR_SUPP_CCS; }
     sd_cmd(CMD_ALL_SEND_CID, 0);
     sd_rca = sd_cmd(CMD_SEND_REL_ADDR, 0) as u64;
-    println!("EMMC: CMD_SEND_REL_ADDR returned {:x}", sd_rca);
+    kprintln!("EMMC: CMD_SEND_REL_ADDR returned {:x}", sd_rca);
     if sd_err != 0 { return sd_err as i32; }
     if { r = sd_clk(25000000) as u64; r } != 0 { return r as i32; }
     sd_cmd(CMD_CARD_SELECT, sd_rca as u32);
@@ -480,10 +480,10 @@ pub unsafe fn sd_init() -> c_int {
         if sd_err != 0 { return sd_err as i32; }
         (*EMMC).CONTROL0.or_mask(C0_HCTL_DWITDH);
     }
-    print!("EMMC: supports ");
-    if sd_scr[0] & SCR_SUPP_SET_BLKCNT != 0 { print!("SET_BLKCNT "); }
-    if ccs != 0 { print!("CCS "); }
-    print!("\n");
+    kprint!("EMMC: supports ");
+    if sd_scr[0] & SCR_SUPP_SET_BLKCNT != 0 { kprint!("SET_BLKCNT "); }
+    if ccs != 0 { kprint!("CCS "); }
+    kprint!("\n");
     sd_scr[0] &= !SCR_SUPP_CCS;
     sd_scr[0] |= ccs;
     return SD_OK as i32;

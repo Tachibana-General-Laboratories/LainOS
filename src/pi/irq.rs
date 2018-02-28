@@ -59,7 +59,7 @@ pub fn enable() {
     // enable interrupts
     // */
     unsafe { asm!("msr daifclr, #2" :::: "volatile") }
-    println!("XXXX");
+    kprintln!("XXXX");
 }
 
 //pub fn timer_irq_setup(period_us: u32, handler: usize) {
@@ -113,7 +113,7 @@ impl ArmTimer {
         reg.Load.write(3000);
         reg.Reload.write(3000);
         reg.IRQ_ClearAck.write(0x1234);
-        println!("free: {}", reg.FreeRunningCounter.read());
+        kprintln!("free: {}", reg.FreeRunningCounter.read());
         Self {
             reg,
         }

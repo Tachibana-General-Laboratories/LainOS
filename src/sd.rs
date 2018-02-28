@@ -188,7 +188,7 @@ unsafe fn sd_cmd(mut code: u32, arg: u32) -> u32 {
         let cmd = if sd_rca != 0 { CMD_RSPNS_48 } else { 0 };
         r = sd_cmd(CMD_APP_CMD | cmd, sd_rca);
         if sd_rca != 0 && r == 0 {
-            println!("ERROR: failed to send SD APP command");
+            kprintln!("ERROR: failed to send SD APP command");
             sd_err = ERROR;
             return 0;
         }
@@ -196,12 +196,12 @@ unsafe fn sd_cmd(mut code: u32, arg: u32) -> u32 {
     }
 
     if sd_status(SR_CMD_INHIBIT) != 0 {
-        println!("ERROR: EMMC busy");
+        kprintln!("ERROR: EMMC busy");
         sd_err = TIMEOUT;
         return 0;
     }
 
-    println!("EMMC: Sending command {:X} arg {:X}", code, arg);
+    kprintln!("EMMC: Sending command {:X} arg {:X}", code, arg);
 
     EMMC_INTERRUPT.write(EMMC_INTERRUPT.read());
     EMMC_ARG1.write(arg);
@@ -215,7 +215,7 @@ unsafe fn sd_cmd(mut code: u32, arg: u32) -> u32 {
 
     r = sd_int(INT_CMD_DONE);
     if r != 0 {
-        println!("ERROR: failed to send EMMC command\n");
+        kprintln!("ERROR: failed to send EMMC command\n");
         sd_err = r;
         return 0;
     }
@@ -250,7 +250,7 @@ unsafe fn sd_cmd(mut code: u32, arg: u32) -> u32 {
 // read a block from sd card and return the number of bytes read
 // returns 0 on error.
 unsafe fn sd_readblock(lba: u32, buffer: &mut [u32]) -> u32 {
-    println!("sd_readblock lba {} len {}", lba, buffer.len());
+    kprintln!("sd_readblock lba {} len {}", lba, buffer.len());
 
     if sd_status(SR_DAT_INHIBIT) != OK {
         sd_err = TIMEOUT;
@@ -289,7 +289,7 @@ unsafe fn sd_readblock(lba: u32, buffer: &mut [u32]) -> u32 {
         }
         let r = sd_int(INT_READ_RDY);
         if r != 0 {
-            println!("ERROR: Timeout waiting for ready to read");
+            kprintln!("ERROR: Timeout waiting for ready to read");
             sd_err = r;
             return 0;
         }
@@ -322,7 +322,7 @@ unsafe fn sd_clk(f: u32) -> u32 {
     let cnt = cnt_wait(1, 100000, || EMMC_STATUS.read() & (SR_CMD_INHIBIT|SR_DAT_INHIBIT) != 0);
 
     if cnt <= 0 {
-        println!("ERROR: timeout waiting for inhibit flag");
+        kprintln!("ERROR: timeout waiting for inhibit flag");
         return ERROR;
     }
 
@@ -351,7 +351,7 @@ unsafe fn sd_clk(f: u32) -> u32 {
         s=0;
     }
 
-    println!("sd_clk divisor {}, shift {}", d, s);
+    kprintln!("sd_clk divisor {}, shift {}", d, s);
     if sd_hv > HOST_SPEC_V2 {
         h = (d&0x300) >> 2;
     }
@@ -364,7 +364,7 @@ unsafe fn sd_clk(f: u32) -> u32 {
 
     let cnt = cnt_wait(10, 10000, || (EMMC_CONTROL1.read() & C1_CLK_STABLE) == 0);
     if cnt == 0 {
-        println!("ERROR: failed to get stable clock");
+        kprintln!("ERROR: failed to get stable clock");
         ERROR
     } else {
         OK
@@ -450,7 +450,7 @@ unsafe fn sd_init() -> u32 {
     sd_cmd(CMD_ALL_SEND_CID, 0);
 
     sd_rca = sd_cmd(CMD_SEND_REL_ADDR, 0);
-    println!("EMMC: CMD_SEND_REL_ADDR returned {}", sd_rca);
+    kprintln!("EMMC: CMD_SEND_REL_ADDR returned {}", sd_rca);
 
     if sd_err != 0 { return sd_err; }
     r = sd_clk(25000000);
@@ -489,14 +489,14 @@ unsafe fn sd_init() -> u32 {
     }
 
     // add software flag
-    print!("EMMC: supports ");
+    kprint!("EMMC: supports ");
     if sd_scr[0] & SCR_SUPP_SET_BLKCNT != 0 {
-        print!("SET_BLKCNT ");
+        kprint!("SET_BLKCNT ");
     }
     if ccs {
-        print("CCS ");
+        kprint("CCS ");
     }
-    println!("");
+    kprintln!("");
     sd_scr[0] &= !SCR_SUPP_CCS;
     sd_scr[0] |= ccs;
     OK

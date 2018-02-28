@@ -52,7 +52,7 @@ impl<'a> Table<'a> {
         let l2 = ((virt >> 21) & 0b111111111) as usize;
         let l3 = ((virt >> 12) & 0b111111111) as usize;
 
-        println!("[{} {} {}] p{:X} -> v{:X}", l1, l2, l3, phy, virt);
+        kprintln!("[{} {} {}] p{:X} -> v{:X}", l1, l2, l3, phy, virt);
 
         const BASE_FLAGS: u64 = PT_PAGE | PT_AF | PT_XN | PT_KERNEL;
 

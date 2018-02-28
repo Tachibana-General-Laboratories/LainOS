@@ -90,10 +90,10 @@ pub extern "C" fn kernel_main() -> ! {
 
     pi::uart0::Uart0::new().initialize();
 
-    println!("      .  ");
-    println!("    < 0 >");
-    println!("    ./ \\.");
-    println!("");
+    kprintln!("      .  ");
+    kprintln!("    < 0 >");
+    kprintln!("    ./ \\.");
+    kprintln!("");
 
     unsafe {
         let f: u32 = (1 << 0) | (1 << 1) | (1 << 2);
@@ -102,7 +102,7 @@ pub extern "C" fn kernel_main() -> ! {
 
     let s = String::from("fucking string!");
 
-    println!("Hello Rust Kernel world! 0x{:X} {}", 0xDEAD, s);
+    kprintln!("Hello Rust Kernel world! 0x{:X} {}", 0xDEAD, s);
 
     unsafe {
         // initialize EMMC and detect SD card type
@@ -130,7 +130,7 @@ pub extern "C" fn kernel_main() -> ! {
             mmu::init();
         }
 
-        println!("enabled mmu");
+        kprintln!("enabled mmu");
 
         if false {
             use volatile::*;
@@ -154,56 +154,45 @@ pub extern "C" fn kernel_main() -> ! {
         let level: u32;
         // read the current level from system register
         asm!("mrs $0, CurrentEL" : "=r" (level) : : : "volatile");
-        println!("Current EL is: 0x{:X} [0x{:X}]", (level >> 2) & 3, level);
+        kprintln!("Current EL is: 0x{:X} [0x{:X}]", (level >> 2) & 3, level);
     }
 
     {
-        print!("Waiting 1000000 CPU cycles (ARM CPU): ");
+        kprint!("Waiting 1000000 CPU cycles (ARM CPU): ");
         util::wait_cycles(1000000);
-        println!("OK");
+        kprintln!("OK");
 
-        print!("Waiting 1000000 microsec (ARM CPU): ");
+        kprint!("Waiting 1000000 microsec (ARM CPU): ");
         util::wait_msec(1000000);
-        println!("OK");
+        kprintln!("OK");
 
-        print!("Waiting 1000000 microsec (BCM System Timer): ");
+        kprint!("Waiting 1000000 microsec (BCM System Timer): ");
         if pi::timer::current_time() == 0 {
-            println!("Not available");
+            kprintln!("Not available");
         } else {
             pi::timer::spin_sleep_us(1000000);
-            println!("OK");
+            kprintln!("OK");
         }
     }
 
-    let info = fb::FrameBufferInfo {
-        width: 360,
-        height: 640,
-        virtual_width: 360,
-        virtual_height: 640,
-        x_offset: 0,
-        y_offset: 0,
-        depth: 32,
-        rgb: false,
-    };
+    kprintln!("init fb");
 
-    println!("init fb");
-
-    match fb::init(info) {
+    match fb::FrameBuffer::new(480, 320, 32) {
         Some(mut fb) =>  {
-            fb.fill_rgba(0xFF0000);
-            fb::font().uprint(&mut fb, 15, 5, "Prepare uranus!", 0x00FF00, 0x0000FF);
-            fb::font().uprint(&mut fb, 15, 6, "Prepare uranus!", 0xFF0000, 0x0000FF);
-            fb::font().uprint(&mut fb, 13, 8, "< Prepare uranus! >", 0xFF0000, 0x000000);
+            fb.fill_rgba(0x000000);
+            fb::font().uprint(&mut fb, 13, 5, "Prepare uranus!", 0x00FF00, 0x0000FF);
+            fb::font().uprint(&mut fb, 13, 6, "Prepare uranus!", 0xFF0000, 0x0000FF);
+            fb::font().uprint(&mut fb, 11, 8, "< Prepare uranus! >", 0xFF0000, 0x000000);
 
-            fb::font().uprint(&mut fb, 20, 10, "  .  ",  0x000000, 0xFF0000);
-            fb::font().uprint(&mut fb, 20, 11, "< 0 >",  0x000000, 0xFF0000);
-            fb::font().uprint(&mut fb, 20, 12, "./ \\.", 0x000000, 0xFF0000);
+            fb::font().uprint(&mut fb, 1, 0, "  .  ",  0xFFFFFF, 0x000000);
+            fb::font().uprint(&mut fb, 1, 1, "< 0 >",  0xFFFFFF, 0x000000);
+            fb::font().uprint(&mut fb, 1, 2, "./ \\.", 0xFFFFFF, 0x000000);
 
         }
-        None => println!("Unable to set screen resolution to 1024x768x32"),
+        None => kprintln!("Unable to set screen resolution to 1024x768x32"),
     }
 
-    println!("init gles: {:?}", gles::InitV3D());
+    kprintln!("init gles: {:?}", gles::InitV3D());
 
     shell::shell("> ")
 }

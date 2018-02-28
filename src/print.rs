@@ -20,19 +20,19 @@ impl fmt::Write for Writer {
 
 pub static UART0: Mutex<Writer> = Mutex::new(Writer);
 
-macro_rules! println {
-    () => (print!("\n"));
-    ($fmt:expr) => (print!(concat!($fmt, "\n")));
-    ($fmt:expr, $($arg:tt)*) => (print!(concat!($fmt, "\n"), $($arg)*));
+macro_rules! kprintln {
+    () => (kprint!("\n"));
+    ($fmt:expr) => (kprint!(concat!($fmt, "\n")));
+    ($fmt:expr, $($arg:tt)*) => (kprint!(concat!($fmt, "\n"), $($arg)*));
 }
 
-macro_rules! print {
+macro_rules! kprint {
     () => ();
     ($($arg:tt)*) => ({
-        $crate::print::print(format_args!($($arg)*));
+        $crate::print::kprint(format_args!($($arg)*));
     });
 }
 
-pub fn print(args: fmt::Arguments) {
+pub fn kprint(args: fmt::Arguments) {
     UART0.lock().write_fmt(args).unwrap();
 }

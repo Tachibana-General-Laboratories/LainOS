@@ -64,6 +64,7 @@ impl fmt::Write for Console {
     }
 }
 
+/*
 /// Global `Console` singleton.
 pub static CONSOLE: Mutex<Console> = Mutex::new(Console::new());
 
@@ -92,3 +93,4 @@ pub macro kprintln {
 pub macro kprint($($arg:tt)*) {
     _print(format_args!($($arg)*))
 }
+*/
