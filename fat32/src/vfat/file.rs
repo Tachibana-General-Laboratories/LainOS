@@ -11,6 +11,8 @@ pub struct File {
     pub vfat: Shared<VFat>,
     pub cluster: Cluster,
     pub size: u64,
+
+    pub position: u64,
 }
 
 // FIXME: Implement `traits::File` (and its supertraits) for `File`.
@@ -30,13 +32,34 @@ impl io::Seek for File {
     /// Seeking before the start of a file or beyond the end of the file results
     /// in an `InvalidInput` error.
     fn seek(&mut self, pos: SeekFrom) -> io::Result<u64> {
-        unimplemented!("File::seek()")
+        let (base, offset) = match pos {
+            SeekFrom::Start(pos) => (pos, 0),
+            SeekFrom::End(pos) => (self.size, pos),
+            SeekFrom::Current(pos) => (self.position, pos),
+        };
+        let pos = if offset >= 0 {
+            base.checked_add(offset as u64)
+        } else {
+            base.checked_sub((offset.wrapping_neg()) as u64)
+        };
+        match pos {
+            Some(pos) if pos <= self.size => {
+                self.position = pos;
+                Ok(pos)
+            }
+            _ => Err(io::Error::new(io::ErrorKind::InvalidInput, "invalid seek")),
+        }
     }
 }
 
 impl io::Read for File {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        unimplemented!()
+        if self.position >= self.size {
+            return Ok(0)
+        }
+        let n = self.vfat.borrow_mut().read_cluster(self.cluster, self.position as usize, buf)?;
+        self.position += n as u64;
+        Ok(n)
     }
 }
 

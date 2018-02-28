@@ -69,17 +69,18 @@ impl VFatDirEntry {
             None
         }
     }
-    pub fn is_end(&self) -> bool {
+
+    fn is_end(&self) -> bool {
         unsafe { self.unknown.stub[0] == 0 }
     }
-    pub fn is_unused(&self) -> bool {
+    fn is_unused(&self) -> bool {
         unsafe { self.unknown.stub[0] == 0xE5 }
     }
-    pub fn is_long(&self) -> bool {
+    fn is_long(&self) -> bool {
         unsafe { self.unknown.stub[11] == 0x0F }
     }
 
-    pub fn cluster(&self) -> Cluster {
+    fn cluster(&self) -> Cluster {
         unsafe {
             let lo = self.regular.lo_cluster as u32;
             let hi = self.regular.hi_cluster as u32;
@@ -87,11 +88,11 @@ impl VFatDirEntry {
         }
     }
 
-    pub fn size(&self) -> u64 {
+    fn size(&self) -> u64 {
         unsafe { self.regular.size as u64 }
     }
 
-    pub fn meta(&self) -> Metadata {
+    fn meta(&self) -> Metadata {
         let regular = unsafe { &self.regular };
         let attributes = regular.attributes;
         let created = Timestamp {
@@ -115,7 +116,7 @@ impl VFatDirEntry {
         }
     }
 
-    pub fn long_name<'a>(&'a self) -> impl Iterator<Item=char> + 'a {
+    fn long_name<'a>(&'a self) -> impl Iterator<Item=char> + 'a {
         use std::char::{decode_utf16, REPLACEMENT_CHARACTER};
         let name0 = decode_utf16(unsafe { self.long_filename.name0.iter().cloned() });
         let name1 = decode_utf16(unsafe { self.long_filename.name1.iter().cloned() });
@@ -125,14 +126,15 @@ impl VFatDirEntry {
             .filter_map(|r| r.ok())
             .filter(|&r| r != '\u{0}' && r != '\u{ffff}')
     }
-    pub fn short_name(&self) -> Result<&str, ::std::str::Utf8Error> {
+
+    fn short_name(&self) -> Result<&str, ::std::str::Utf8Error> {
         use std::str::from_utf8;
         let filter: &[_] = &['\0', ' '];
         let s = unsafe { &self.regular.name[..] };
         Ok(from_utf8(s)?.trim_right_matches(filter))
     }
 
-    pub fn short_ext(&self) -> Result<&str, ::std::str::Utf8Error> {
+    fn short_ext(&self) -> Result<&str, ::std::str::Utf8Error> {
         use std::str::from_utf8;
         let filter: &[_] = &['\0', ' '];
         let s = unsafe { &self.regular.ext[..] };
@@ -166,7 +168,6 @@ impl Dir {
             Err(io::Error::new(io::ErrorKind::InvalidInput, "fail name"))
         }
     }
-
     pub fn root(vfat: Shared<VFat>) -> Self {
         let cluster = vfat.borrow().root_dir_cluster;
         Self {
@@ -263,6 +264,7 @@ impl Iterator for DirIter {
                     vfat: self.vfat.clone(),
                     size: e.size(),
                     cluster: e.cluster(),
+                    position: 0,
                 })
             };
             return Some(e);

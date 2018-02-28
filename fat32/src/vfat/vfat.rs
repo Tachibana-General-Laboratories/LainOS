@@ -25,8 +25,12 @@ impl VFat {
         where T: BlockDevice + 'static
     {
         let mbr = MasterBootRecord::from(&mut device)?;
-        let start_bpb = mbr.table[0].relative_sector as u64;
-        //let start_bpb = 1;
+        let start = mbr.table[0].relative_sector as u64;
+        let bpb = BiosParameterBlock::from(&mut device, start)?;
+
+        //println!("{:#?}", mbr);
+        //println!("{:#?}", bpb);
+
         let BiosParameterBlock {
             bytes_per_sector,
             sectors_per_cluster,
@@ -36,10 +40,10 @@ impl VFat {
 
             num_of_fats,
             ..
-        } = BiosParameterBlock::from(&mut device, start_bpb)?;
+        } = bpb;
 
-        let fat_start_sector = num_reserved_sectors as u64;
-        let data_start_sector = fat_start_sector + num_of_fats as u64 * sectors_per_fat as u64; //unimplemented!();
+        let fat_start_sector = start + num_reserved_sectors as u64;
+        let data_start_sector = fat_start_sector + num_of_fats as u64 * sectors_per_fat as u64;
 
         Ok(Shared::new(Self {
             bytes_per_sector,
@@ -49,8 +53,8 @@ impl VFat {
             data_start_sector,
             root_dir_cluster: Cluster::from(root_dir_cluster),
             device: CachedDevice::new(device, Partition {
-                start: 0,
-                sector_size: 512,
+                start,
+                sector_size: bytes_per_sector as u64,
             }),
         }))
     }
@@ -60,16 +64,51 @@ impl VFat {
         self.read_cluster(cluster, 0, buf)
     }
 
+    fn sector(&self, cluster: Cluster) -> u64 {
+        self.data_start_sector + cluster.sector(self.sectors_per_cluster)
+    }
+
     /// A method to read from an offset of a cluster into a buffer.
-    fn read_cluster(&mut self, cluster: Cluster, offset: usize, buf: &mut [u8]) -> io::Result<usize> {
-        assert_eq!(offset, 0, "unimpl");
-        assert_eq!(self.sectors_per_cluster, 1, "unimpl");
+    pub fn read_cluster(&mut self, mut cluster: Cluster, offset: usize, mut buf: &mut [u8]) -> io::Result<usize> {
+        use vfat::Status::*;
+        use std::io::{Cursor, Write};
+        let bytes_per_sector = self.bytes_per_sector as usize;
 
-        let from_start = ((cluster.to64() - 2) * self.sectors_per_cluster as u64);
-        let sector = self.data_start_sector as u64 + from_start;
+        let mut skip_sectors = offset / bytes_per_sector;
+        let mut offset = offset % bytes_per_sector;
 
+        let mut count = 0;
+        let mut tmp = Vec::with_capacity(bytes_per_sector);
+        let mut cursor = Cursor::new(buf);
 
-        self.device.read_sector(sector, buf)
+        'end:
+        loop {
+            let sector = self.sector(cluster);
+            for i in 0..self.sectors_per_cluster as u64 {
+                if skip_sectors > 0 {
+                    skip_sectors -= 1;
+                    continue;
+                }
+                self.device.read_all_sector(sector + i, &mut tmp)?;
+                {
+                    let tmp = &tmp[offset..];
+                    let n = cursor.write(&tmp)?;
+                    count += n;
+                    if n == 0 {
+                        break 'end;
+                    }
+                }
+                offset = 0;
+                tmp.clear();
+            }
+
+            match self.fat_entry(cluster)?.status() {
+                Data(next) => cluster = next,
+                Eoc(_) => break,
+                _ => break,
+            }
+        }
+        Ok(count)
     }
 
     /// A method to read all of the clusters chained from a starting cluster
@@ -78,20 +117,14 @@ impl VFat {
         use vfat::Status::*;
         let mut cluster = start;
         loop {
-            let from_start = ((cluster.to64() - 2) * self.sectors_per_cluster as u64);
-            let sector = self.data_start_sector as u64 + from_start;
-
+            let sector = self.sector(cluster);
             for i in 0..self.sectors_per_cluster as u64 {
                 self.device.read_all_sector(sector + i, buf)?;
             }
-
             match self.fat_entry(cluster)?.status() {
                 Data(next) => cluster = next,
-                Eoc(v) => {
-                    println!("EOC {}", v);
-                    break;
-                },
-                _ => unimplemented!(),
+                Eoc(_) => break,
+                _ => break,
             }
         }
         Ok(buf.len())
@@ -115,7 +148,11 @@ impl<'a> FileSystem for &'a Shared<VFat> {
     type Entry = Entry;
 
     fn open<P: AsRef<Path>>(self, path: P) -> io::Result<Self::Entry> {
-        unimplemented!("FileSystem::open()")
+        if path.as_ref().to_str() == Some("/") {
+            Ok(Entry::Dir(Dir::root(self.clone())))
+        } else {
+            unimplemented!()
+        }
     }
 
     fn create_file<P: AsRef<Path>>(self, _path: P) -> io::Result<Self::File> {

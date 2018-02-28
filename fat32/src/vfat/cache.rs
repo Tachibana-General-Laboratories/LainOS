@@ -82,6 +82,9 @@ impl CachedDevice {
     /// Returns an error if there is an error reading the sector from the disk.
     pub fn get_mut(&mut self, sector: u64) -> io::Result<&mut [u8]> {
         use std::collections::hash_map::Entry;
+
+        let (sector, _) = self.virtual_to_physical(sector);
+
         let entry = match self.cache.entry(sector) {
             Entry::Occupied(mut entry) => {
                 entry.get_mut().dirty = true;
@@ -104,6 +107,9 @@ impl CachedDevice {
     /// Returns an error if there is an error reading the sector from the disk.
     pub fn get(&mut self, sector: u64) -> io::Result<&[u8]> {
         use std::collections::hash_map::Entry;
+
+        let (sector, _) = self.virtual_to_physical(sector);
+
         let entry = match self.cache.entry(sector) {
             Entry::Occupied(mut entry) => {
                 entry.into_mut()
