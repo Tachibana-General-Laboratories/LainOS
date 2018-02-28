@@ -148,11 +148,23 @@ impl<'a> FileSystem for &'a Shared<VFat> {
     type Entry = Entry;
 
     fn open<P: AsRef<Path>>(self, path: P) -> io::Result<Self::Entry> {
-        if path.as_ref().to_str() == Some("/") {
-            Ok(Entry::Dir(Dir::root(self.clone())))
-        } else {
-            unimplemented!()
+        use std::path::*;
+        let mut root = Dir::root(self.clone());
+        for c in path.as_ref().components() {
+            match c {
+                Component::RootDir => (),
+                Component::Normal(p) => {
+                    match root.find(p)? {
+                        file @ Entry::File(_) => return Ok(file),
+                        Entry::Dir(dir) => root = dir,
+                    }
+                }
+                Component::Prefix(_) => unimplemented!(),
+                Component::CurDir => unimplemented!(),
+                Component::ParentDir => unimplemented!(),
+            }
         }
+        Ok(Entry::Dir(root))
     }
 
     fn create_file<P: AsRef<Path>>(self, _path: P) -> io::Result<Self::File> {

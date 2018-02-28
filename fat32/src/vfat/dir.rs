@@ -122,23 +122,30 @@ impl VFatDirEntry {
         let name1 = decode_utf16(unsafe { self.long_filename.name1.iter().cloned() });
         let name2 = decode_utf16(unsafe { self.long_filename.name2.iter().cloned() });
         name0.chain(name1).chain(name2)
-            //.map(|r| r.unwrap_or(REPLACEMENT_CHARACTER))
-            .filter_map(|r| r.ok())
-            .filter(|&r| r != '\u{0}' && r != '\u{ffff}')
+            .take_while(|r| r.is_ok())
+            .map(|r| r.unwrap_or('#'))
+            .take_while(|&r| r != '\u{0}' && r != '\u{ffff}')
     }
 
-    fn short_name(&self) -> Result<&str, ::std::str::Utf8Error> {
-        use std::str::from_utf8;
-        let filter: &[_] = &['\0', ' '];
-        let s = unsafe { &self.regular.name[..] };
-        Ok(from_utf8(s)?.trim_right_matches(filter))
-    }
+    fn short_name(&self) -> String {
+        let name = unsafe { &self.regular.name[..] };
+        let ext = unsafe { &self.regular.ext[..] };
 
-    fn short_ext(&self) -> Result<&str, ::std::str::Utf8Error> {
-        use std::str::from_utf8;
-        let filter: &[_] = &['\0', ' '];
-        let s = unsafe { &self.regular.ext[..] };
-        Ok(from_utf8(s)?.trim_right_matches(filter))
+        let mut name: String = name.iter()
+            .filter(|&&c| c != 0 && c != b' ')
+            .map(|&c| c as char)
+            .collect();
+
+        let ext: String = ext.iter()
+            .filter(|&&c| c != 0 && c != b' ')
+            .map(|&c| c as char)
+            .collect();
+
+        if ext.len() == 3 {
+            name + "." + &ext
+        } else {
+            name
+        }
     }
 }
 
@@ -227,22 +234,18 @@ impl Iterator for DirIter {
             let e = *self.next_dir_entry().and_then(VFatDirEntry::and_end)?;
             self.current += 1;
 
-            if e.is_unused() {
-                continue;
-            }
-            if e.is_long() {
+            if e.is_long()  {
                 let s: String = e.long_name().collect();
+                if s.len() >= 3 && &s[..3] == "._." {
+                    continue;
+                }
                 self.name = s + &self.name;
                 continue;
             }
 
+
             if self.name.is_empty() {
-                self.name.extend(e.short_name().unwrap().chars());
-                let ext: Vec<_> = e.short_ext().unwrap().chars().collect();
-                if !ext.is_empty() {
-                    self.name.push('.');
-                    self.name.extend(ext);
-                }
+                self.name += &e.short_name();
             }
 
             let name = self.name.clone();

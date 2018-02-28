@@ -234,7 +234,7 @@ fn hash_dir_recursive_from<P: AsRef<Path>>(vfat: Shared<VFat>, path: P) -> Strin
 }
 
 #[test]
-#[ignore]
+//#[ignore]
 fn test_all_dir_entries() {
     let hash = hash_dir_recursive_from(vfat_from_resource!("mock1.fat32.img"), "/");
     assert_hash_eq!("mock 1 all dir entries", hash, hash_for!("all-entries-1"));
