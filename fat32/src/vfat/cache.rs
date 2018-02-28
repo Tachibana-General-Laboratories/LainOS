@@ -1,5 +1,6 @@
 use std::{io, fmt};
 use std::collections::HashMap;
+use fnv::*;
 
 use traits::BlockDevice;
 
@@ -18,7 +19,7 @@ struct CacheEntry {
 
 pub struct CachedDevice {
     device: Box<BlockDevice>,
-    cache: HashMap<u64, CacheEntry>,
+    cache: HashMap<u64, CacheEntry, FnvBuildHasher>,
     partition: Partition,
 }
 
@@ -49,7 +50,7 @@ impl CachedDevice {
 
         Self {
             device: Box::new(device),
-            cache: HashMap::new(),
+            cache: HashMap::default(),
             partition: partition
         }
     }
