@@ -17,8 +17,8 @@ pub use self::error::Error;
 pub use self::vfat::VFat;
 pub use self::entry::Entry;
 pub use self::metadata::{Metadata, Attributes, Date, Time, Timestamp};
+pub use self::shared::Shared;
 
-pub(crate) use self::shared::Shared;
 pub(crate) use self::cache::{CachedDevice, Partition};
 pub(crate) use self::fat::{Status, FatEntry};
 pub(crate) use self::cluster::Cluster;
