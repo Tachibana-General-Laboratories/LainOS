@@ -20,12 +20,9 @@ extern crate log;
 
 extern crate fat32;
 
-#[macro_use]
 #[cfg(not(test))]
-pub mod print;
+pub mod console;
 
-//#[cfg(not(test))]
-//pub mod console;
 pub mod externs;
 #[cfg(not(test))]
 pub mod panic;
@@ -45,7 +42,7 @@ pub mod fb;
 #[cfg(not(test))]
 pub mod shell;
 //pub mod sd;
-pub mod sdn;
+//pub mod sdn;
 pub mod gles;
 
 
@@ -56,6 +53,8 @@ pub mod allocator;
 
 use slab_allocator::LockedHeap;
 use alloc::*;
+
+use console::{kprint, kprintln};
 
 #[cfg(not(test))]
 #[global_allocator]
@@ -95,7 +94,7 @@ pub fn init_heap() {
 pub extern "C" fn kernel_main() -> ! {
     init_heap();
 
-    pi::uart0::Uart0::new().initialize();
+    //pi::uart0::Uart0::new().initialize();
 
     kprintln!("      .  ");
     kprintln!("    < 0 >");

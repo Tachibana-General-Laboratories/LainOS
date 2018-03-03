@@ -1,3 +1,5 @@
+use console::{kprint, kprintln};
+
 #[inline(always)]
 pub fn nop_while<F>(mut f: F)
     where F: FnMut() -> bool

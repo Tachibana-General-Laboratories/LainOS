@@ -1,3 +1,5 @@
+use console::{kprint, kprintln};
+
 use std::fmt;
 
 #[lang = "eh_personality"]

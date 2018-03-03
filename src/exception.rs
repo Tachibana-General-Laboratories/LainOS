@@ -1,3 +1,4 @@
+use console::{kprint, kprintln};
 
 // common exception handler
 #[no_mangle]

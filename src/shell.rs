@@ -1,6 +1,8 @@
 use stack_vec::StackVec;
 use std::str::from_utf8;
 
+use console::{kprint, kprintln};
+
 use pi::uart0;
 use pi::power;
 use util;

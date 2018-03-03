@@ -28,17 +28,23 @@ impl Console {
     /// Returns a mutable borrow to the inner `MiniUart`, initializing it as
     /// needed.
     fn inner(&mut self) -> &mut MiniUart {
-        self.inner.as_mut().unwrap()
+        match self.inner {
+            Some(ref mut uart) => uart,
+            None => {
+                self.initialize();
+                self.inner.as_mut().unwrap()
+            }
+        }
     }
 
     /// Reads a byte from the UART device, blocking until a byte is available.
     pub fn read_byte(&mut self) -> u8 {
-        unimplemented!()
+        self.inner().receive()
     }
 
     /// Writes the byte `byte` to the UART device.
     pub fn write_byte(&mut self, byte: u8) {
-        unimplemented!()
+        self.inner().send(byte)
     }
 }
 
@@ -60,11 +66,18 @@ impl io::Write for Console {
 
 impl fmt::Write for Console {
     fn write_str(&mut self, s: &str) -> fmt::Result {
-        unimplemented!()
+        let mut uart = self.inner();
+        for c in s.chars() {
+            // convert newline to carrige return + newline
+            if c == '\n' {
+                uart.send(b'\r');
+            }
+            uart.send(c as u8)
+        }
+        Ok(())
     }
 }
 
-/*
 /// Global `Console` singleton.
 pub static CONSOLE: Mutex<Console> = Mutex::new(Console::new());
 
@@ -93,4 +106,3 @@ pub macro kprintln {
 pub macro kprint($($arg:tt)*) {
     _print(format_args!($($arg)*))
 }
-*/
