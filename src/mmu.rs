@@ -3,7 +3,7 @@ use std::slice;
 use volatile::prelude::*;
 use volatile::Volatile;
 
-use console::{kprint, kprintln};
+use console::kprintln;
 
 pub const PAGESIZE: usize = 4096;
 const TTBR_ENABLE: usize = 1;

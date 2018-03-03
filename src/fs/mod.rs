@@ -26,15 +26,12 @@ impl FileSystem {
     ///
     /// Panics if the underlying disk or file sytem failed to initialize.
     pub fn initialize(&self) {
-        use std::borrow::BorrowMut;
         let sd = Sd::new().unwrap();
         let vfat = VFat::from(sd).unwrap();
-
         *self.0.lock() = Some(vfat);
     }
 }
 
-// FIXME: Implement `fat32::traits::FileSystem` for a useful type.
 impl<'a> traits::FileSystem for &'a FileSystem {
     type File = vfat::File;
     type Dir = vfat::Dir;

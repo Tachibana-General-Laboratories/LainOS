@@ -5,8 +5,8 @@
 #![feature(global_allocator)]
 #![feature(decl_macro)]
 
-#[macro_use]
-extern crate bitflags;
+//#[macro_use]
+//extern crate bitflags;
 
 #[macro_use]
 extern crate alloc;
@@ -43,7 +43,7 @@ pub mod fb;
 pub mod shell;
 //pub mod sd;
 //pub mod sdn;
-pub mod gles;
+//pub mod gles;
 
 
 pub mod fs;
@@ -75,7 +75,7 @@ const ADDR_512MB: usize = 0x2000_0000;
 const ADDR_1GB: usize   = 0x4000_0000;
 const ADDR_2GB: usize   = 0x8000_0000;
 
-static FILE_SYSTEM: fs::FileSystem = fs::FileSystem::uninitialized();
+pub static FILE_SYSTEM: fs::FileSystem = fs::FileSystem::uninitialized();
 
 #[cfg(not(test))]
 pub fn init_heap() {
@@ -194,7 +194,7 @@ pub extern "C" fn kernel_main() -> ! {
         None => kprintln!("Unable to set screen resolution to 1024x768x32"),
     }
 
-    kprintln!("init gles: {:?}", gles::InitV3D());
+    //kprintln!("init gles: {:?}", gles::InitV3D());
 
     shell::shell("> ")
 }

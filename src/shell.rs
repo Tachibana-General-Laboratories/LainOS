@@ -1,11 +1,16 @@
 use stack_vec::StackVec;
 use std::str::from_utf8;
 
-use console::{kprint, kprintln};
-
-use pi::uart0;
 use pi::power;
 use util;
+use console::{kprint, kprintln, CONSOLE};
+
+use std::io::{self, Write, Read};
+
+use std::path::PathBuf;
+
+use super::FILE_SYSTEM;
+use fat32::traits::*;
 
 /// Error type for `Command` parse failures.
 #[derive(Debug)]
@@ -49,12 +54,17 @@ impl<'a> Command<'a> {
 /// Starts a shell using `prefix` as the prefix for each line. This function
 /// never returns: it is perpetually in a shell loop.
 pub fn shell(prefix: &str) -> ! {
+    use std::io::Write;
     kprint!("\n{}", prefix);
+
+    let working_directory = PathBuf::from("/");
+    let mut shell = Shell { working_directory };
 
     let mut buf = [0u8; 512];
     let mut buf = StackVec::new(&mut buf);
     loop {
-        match uart0::receive() {
+        let byte = CONSOLE.lock().read_byte();
+        match byte {
             0 => (),
             b'\r' | b'\n' => {
                 kprint!("\r\n");
@@ -65,7 +75,7 @@ pub fn shell(prefix: &str) -> ! {
                         Err(Error::Empty) => (),
                         Err(Error::TooManyArgs) => kprintln!("error: too many arguments"),
                         Ok(cmd) => {
-                            run_cmd(cmd);
+                            shell.run(cmd);
                             kprint!("\r\n");
                         }
                     }
@@ -73,84 +83,111 @@ pub fn shell(prefix: &str) -> ! {
                 buf.truncate(0);
                 kprint!("{}", prefix);
             }
-            127 => (), // DEL
+            127 => kprintln!("DEL"), // DEL
             8 => { // BS
                 if !buf.is_empty() {
-                    uart0::send(8);
-                    uart0::send(32);
-                    uart0::send(8);
+                    CONSOLE.lock().write(&[8, 32, 8]).unwrap();
                     buf.pop();
                 }
             }
             c @ 32...126 => {
                 if !buf.is_full() {
                     buf.push(c).unwrap();
-                    uart0::send(c);
+                    CONSOLE.lock().write(&[c]).unwrap();
                 }
             }
-            _ => uart0::send(7), // send bell
+            _ => {
+                // send bell
+                CONSOLE.lock().write(&[7]).unwrap();
+            }
         }
     }
 }
 
-fn run_cmd(cmd: Command) {
-    match cmd.path() {
-        "echo" => echo(cmd.args),
-        "ls" => ls(cmd.args),
-        "dump" => dump(cmd.args),
-        "poweroff" => {
-            kprint!("power-off the machine\n");
-            power::power_off();
-        }
-        "halt" => {
-            kprint!("halt the machine\n");
-            power::halt();
-        }
-        "reset" => {
-            kprint!("reset the machine\n");
-            power::reset();
-        }
-        _ => kprint!("unknown command: {}", cmd.path()),
-    }
+struct Shell {
+    working_directory: PathBuf,
 }
 
-fn echo<'a>(args: StackVec<'a, &'a str>) {
-    for (i, arg) in args.iter().enumerate() {
-        match i {
-            0 => (),
-            1 => kprint!("{}", arg),
-            _ => kprint!(" {}", arg),
+impl Shell {
+    fn run(&mut self, cmd: Command) {
+        match cmd.path() {
+            "pwd" => self.pwd(cmd.args),
+            "cd" => self.cd(cmd.args),
+            "ls" => self.ls(cmd.args),
+            "cat" => self.cat(cmd.args),
+
+            "echo" => self.echo(cmd.args),
+            "poweroff" => {
+                kprintln!("power-off the machine");
+                power::power_off();
+            }
+            "halt" => {
+                kprintln!("halt the machine");
+                power::halt();
+            }
+            "reset" => {
+                kprintln!("reset the machine");
+                power::reset();
+            }
+            _ => kprint!("unknown command: {}", cmd.path()),
         }
     }
-}
 
-fn ls<'a>(args: StackVec<'a, &'a str>) {
-    let dir = if args.len() > 1 {
-        args[1]
-    } else {
-        ""
-    };
-    kprintln!("  no file system yet;   but... maybe {} is:", dir);
-    match dir {
-        "/" => kprint!("bin etc sys usr var"),
-        _ => kprint!("ls: cannot access '{}': No such file or directory", dir),
-    }
-}
-
-
-fn dump<'a>(args: StackVec<'a, &'a str>) {
-    if args.len() < 2 {
-        kprintln!("usage:");
-        kprint!  ("    dump <hex addr> <size=512>");
-        return;
+    fn echo(&self, args: StackVec<&str>) {
+        for (i, arg) in args.iter().enumerate() {
+            match i {
+                0 => (),
+                1 => kprint!("{}", arg),
+                _ => kprint!(" {}", arg),
+            }
+        }
     }
 
-    let addr = usize::from_str_radix(args[1], 16).unwrap_or(0x80_0000);
-    let size = if args.len() > 2 {
-        usize::from_str_radix(args[2], 10).unwrap_or(256)
-    } else {
-        256
-    };
+    fn cd(&mut self, args: StackVec<&str>) {
+        if args.len() == 1 {
+            self.working_directory = PathBuf::from("/");
+        } else {
+            let mut dir = self.working_directory.clone();
+            dir.push(args[1]);
+            match FILE_SYSTEM.open_dir(&dir) {
+                Ok(e) => self.working_directory = dir,
+                Err(err) => kprintln!("cd: {:?}", err),
+            }
+        }
+    }
 
-    util::dump(addr as *const u8, size);
+    fn ls(&mut self, args: StackVec<&str>) {
+        let mut dir = self.working_directory.clone();
+        if args.len() > 1 {
+            dir.push(args[1])
+        }
+        match FILE_SYSTEM.open_dir(&dir).and_then(|e| e.entries()) {
+            Ok(entries) => {
+                for e in entries {
+                    kprintln!("{}", e.name());
+                }
+            }
+            Err(err) => kprintln!("ls: {}", err),
+        }
+    }
+
+    fn pwd(&mut self, args: StackVec<&str>) {
+        kprint!("{}", self.working_directory.to_str().unwrap());
+    }
+
+    fn cat(&mut self, args: StackVec<&str>) {
+        if args.len() == 1 {
+            return
+        }
+        let mut dir = self.working_directory.clone();
+        dir.push(args[1]);
+
+        match FILE_SYSTEM.open_file(&dir) {
+            Ok(mut r) => {
+                let mut w = CONSOLE.lock();
+                io::copy(&mut r, &mut *w).unwrap();
+            }
+            Err(err) => kprintln!("cat: {}", err),
+        }
+    }
 }

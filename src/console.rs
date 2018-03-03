@@ -50,13 +50,19 @@ impl Console {
 
 impl io::Read for Console {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        unimplemented!()
+        for c in buf.iter_mut() {
+            *c = self.read_byte();
+        }
+        Ok(buf.len())
     }
 }
 
 impl io::Write for Console {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        unimplemented!()
+        for &c in buf.iter() {
+            self.write_byte(c);
+        }
+        Ok(buf.len())
     }
 
     fn flush(&mut self) -> io::Result<()> {
