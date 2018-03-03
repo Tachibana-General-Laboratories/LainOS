@@ -23,6 +23,8 @@
   "position-independent-executables": true,
   "target-c-int-width": "32",
   "target-endian": "little",
+  "target-family": "unix",
+  "os": "ros",
   "target-pointer-width": "64",
   "disable-redzone": true
 }

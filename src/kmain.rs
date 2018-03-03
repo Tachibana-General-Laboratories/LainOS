@@ -18,6 +18,8 @@ extern crate volatile;
 #[macro_use]
 extern crate log;
 
+extern crate fat32;
+
 #[macro_use]
 #[cfg(not(test))]
 pub mod print;
@@ -45,6 +47,9 @@ pub mod shell;
 //pub mod sd;
 pub mod sdn;
 pub mod gles;
+
+
+pub mod fs;
 
 
 pub mod allocator;
@@ -104,26 +109,23 @@ pub extern "C" fn kernel_main() -> ! {
 
     kprintln!("Hello Rust Kernel world! 0x{:X} {}", 0xDEAD, s);
 
-    unsafe {
-        // initialize EMMC and detect SD card type
-        if false && sdn::sd_init() == 0  {
-            // read the master boot record after our bss segment
-            let p = 0x00F0_0000 as *mut u8;
-            let len = sdn::sd_readblock(0, p, 1) as usize;
-            if len != 0 {
-                // dump it to serial console
-                util::dump(p, len);
-            }
 
-            let p = p.offset(len as isize);
-            let len = sdn::sd_readblock(1, p, 1) as usize;
-            if len != 0 {
-                // dump it to serial console
-                util::dump(p, len);
-            }
-        }
+    kprintln!("init fs");
+    let fs = fs::FileSystem::uninitialized();
+    fs.initialize();
+
+    {
+        use fat32::traits::{FileSystem, Entry};
+        use std::io::Read;
+        let f = fs.open("/README.md").unwrap();
+        let mut f = f.into_file().unwrap();
+
+        let mut s = String::new();
+        f.read_to_string(&mut s).unwrap();
+        kprintln!("--------");
+        kprintln!("{}", s);
+        kprintln!("--------");
     }
-
 
     if true {
         unsafe {

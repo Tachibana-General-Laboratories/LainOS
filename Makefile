@@ -30,7 +30,13 @@ all: $(KERNEL).img
 
 qemu: all
 	#qemu-system-aarch64 -M raspi3 -serial stdio -kernel $(KERNEL).img   #-d in_asm
-	qemu-system-aarch64 -M raspi3 -drive file=raspi3-lainos.json,if=sd,format=raw -serial stdio -kernel $(KERNEL).img
+		#-drive file=files/resources/mock1.fat32.img,if=sd,format=raw \
+	#
+	qemu-system-aarch64 -M raspi3 \
+		-display sdl,gl=on -sdl \
+		-drive file=fs.img,if=sd,format=raw \
+		-serial stdio \
+		-kernel $(KERNEL).img
 	#qemu-system-aarch64 -M raspi3 -kernel $(KERNEL).img   #-d in_asm
 
 test:
