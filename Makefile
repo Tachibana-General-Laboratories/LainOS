@@ -43,8 +43,8 @@ test:
 	cargo test
 
 clean:
-	$(XARGO) clean
 	rm -rf $(BUILD_DIR)
+	$(XARGO) clean
 
 check:
 	$(XARGO) check --target=$(TARGET)

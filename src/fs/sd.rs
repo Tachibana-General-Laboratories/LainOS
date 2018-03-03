@@ -1,7 +1,7 @@
 use std::io;
 use fat32::traits::BlockDevice;
 
-use utils::wait_msec;
+use util::wait_msec;
 
 extern "C" {
     /// A global representing the last SD controller error that occured.

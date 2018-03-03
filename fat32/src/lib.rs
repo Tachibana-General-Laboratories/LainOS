@@ -8,7 +8,11 @@ compile_error!("only little endian platforms supported");
 extern crate fnv;
 
 #[cfg(test)]
+extern crate rand;
+
+#[cfg(test)]
 mod tests;
+
 mod mbr;
 mod util;
 
