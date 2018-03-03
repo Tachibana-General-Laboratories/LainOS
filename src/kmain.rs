@@ -118,7 +118,7 @@ pub extern "C" fn kernel_main() -> ! {
     {
         use fat32::traits::{FileSystem, Entry};
         use std::io::Read;
-        let f = fs.open("/README.md").unwrap();
+        let f = FILE_SYSTEM.open("/README.md").unwrap();
         let mut f = f.into_file().unwrap();
 
         let mut s = String::new();
