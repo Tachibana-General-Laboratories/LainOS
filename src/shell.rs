@@ -2,12 +2,11 @@ use stack_vec::StackVec;
 use std::str::from_utf8;
 
 use pi::power;
-use util;
 use console::{kprint, kprintln, CONSOLE};
 
-use std::io::{self, Write, Read};
+use std::io;
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use super::FILE_SYSTEM;
 use fat32::traits::*;
@@ -37,11 +36,9 @@ impl<'a> Command<'a> {
         for arg in s.split(' ').filter(|a| !a.is_empty()) {
             args.push(arg).map_err(|_| Error::TooManyArgs)?;
         }
-
         if args.is_empty() {
             return Err(Error::Empty);
         }
-
         Ok(Command { args })
     }
 
@@ -57,8 +54,7 @@ pub fn shell(prefix: &str) -> ! {
     use std::io::Write;
     kprint!("\n{}", prefix);
 
-    let working_directory = PathBuf::from("/");
-    let mut shell = Shell { working_directory };
+    let mut shell = Shell { cwd: PathBuf::from("/") };
 
     let mut buf = [0u8; 512];
     let mut buf = StackVec::new(&mut buf);
@@ -74,17 +70,13 @@ pub fn shell(prefix: &str) -> ! {
                     match Command::parse(s, &mut str_buf) {
                         Err(Error::Empty) => (),
                         Err(Error::TooManyArgs) => kprintln!("error: too many arguments"),
-                        Ok(cmd) => {
-                            shell.run(cmd);
-                            kprint!("\r\n");
-                        }
+                        Ok(cmd) => shell.run(cmd),
                     }
                 }
                 buf.truncate(0);
                 kprint!("{}", prefix);
             }
-            127 => kprintln!("DEL"), // DEL
-            8 => { // BS
+            127 | 8 => { // DEL | BS
                 if !buf.is_empty() {
                     CONSOLE.lock().write(&[8, 32, 8]).unwrap();
                     buf.pop();
@@ -105,18 +97,24 @@ pub fn shell(prefix: &str) -> ! {
 }
 
 struct Shell {
-    working_directory: PathBuf,
+    cwd: PathBuf,
 }
 
 impl Shell {
     fn run(&mut self, cmd: Command) {
         match cmd.path() {
-            "pwd" => self.pwd(cmd.args),
+            "echo" => {
+                self.echo(cmd.args);
+                kprint!("\r\n");
+            }
+            "pwd" => {
+                kprint!("{}", self.cwd.to_str().unwrap());
+                kprint!("\r\n");
+            }
             "cd" => self.cd(cmd.args),
             "ls" => self.ls(cmd.args),
             "cat" => self.cat(cmd.args),
 
-            "echo" => self.echo(cmd.args),
             "poweroff" => {
                 kprintln!("power-off the machine");
                 power::power_off();
@@ -129,8 +127,36 @@ impl Shell {
                 kprintln!("reset the machine");
                 power::reset();
             }
-            _ => kprint!("unknown command: {}", cmd.path()),
+            _ => kprintln!("unknown command: {}", cmd.path()),
         }
+    }
+
+    fn canonicalize<P: AsRef<Path>>(&self, p: P) -> io::Result<PathBuf> {
+        use std::path::Component::*;
+
+        let mut result = PathBuf::new();
+        for (i, c) in p.as_ref().components().enumerate() {
+            match c {
+            Prefix(_) => unimplemented!(),
+            CurDir => result.push(&self.cwd),
+            RootDir => result.push(RootDir),
+            ParentDir if i == 0 => {
+                if let Some(parent) = self.cwd.parent() {
+                    result.push(parent)
+                } else {
+                    return Err(io::Error::new(io::ErrorKind::NotFound, "fail cwd.parent dir"));
+                }
+            }
+            ParentDir => {
+                if !result.pop() {
+                    return Err(io::Error::new(io::ErrorKind::NotFound, "fail parent dir"));
+                }
+            }
+            Normal(s) => result.push(s),
+            }
+        }
+
+        Ok(result)
     }
 
     fn echo(&self, args: StackVec<&str>) {
@@ -144,20 +170,23 @@ impl Shell {
     }
 
     fn cd(&mut self, args: StackVec<&str>) {
+        // TODO: "." and ".." support
         if args.len() == 1 {
-            self.working_directory = PathBuf::from("/");
+            self.cwd = PathBuf::from("/");
         } else {
-            let mut dir = self.working_directory.clone();
+            let mut dir = self.cwd.clone();
             dir.push(args[1]);
-            match FILE_SYSTEM.open_dir(&dir) {
-                Ok(e) => self.working_directory = dir,
+            let dir = self.canonicalize(&dir)
+                .and_then(|dir| FILE_SYSTEM.open_dir(&dir).map(|_| dir));
+            match dir {
+                Ok(dir) => self.cwd = dir,
                 Err(err) => kprintln!("cd: {:?}", err),
             }
         }
     }
 
     fn ls(&mut self, args: StackVec<&str>) {
-        let mut dir = self.working_directory.clone();
+        let mut dir = self.cwd.clone();
         if args.len() > 1 {
             dir.push(args[1])
         }
@@ -171,17 +200,12 @@ impl Shell {
         }
     }
 
-    fn pwd(&mut self, args: StackVec<&str>) {
-        kprint!("{}", self.working_directory.to_str().unwrap());
-    }
-
     fn cat(&mut self, args: StackVec<&str>) {
         if args.len() == 1 {
             return
         }
-        let mut dir = self.working_directory.clone();
+        let mut dir = self.cwd.clone();
         dir.push(args[1]);
-
         match FILE_SYSTEM.open_file(&dir) {
             Ok(mut r) => {
                 let mut w = CONSOLE.lock();

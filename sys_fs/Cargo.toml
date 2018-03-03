@@ -1,5 +1,5 @@
 [package]
-name = "fat32"
+name = "sys_fs"
 version = "0.1.0"
 
 [dependencies]

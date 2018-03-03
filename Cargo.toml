@@ -9,19 +9,20 @@ members = [
 	"std",
 	"vc4",
 	"xmodem",
-	"fat32",
+	"sys_fs",
 ]
 
 [dependencies]
 spin = "*"
 slab_allocator = "0.3.0"
 bitflags = "1.0"
-#pi = { path = "../pi", features = ["std"] }
 
-fat32 = { path = "fat32" }
+sys_fs = { path = "sys_fs" }
 stack-vec = { path = "stack-vec" }
 volatile = { path = "volatile" }
+
 #std = { path = "std" }
+#pi = { path = "../pi", features = ["std"] }
 
 log = { version = "0.4", features = ["max_level_debug", "release_max_level_warn"] }
 

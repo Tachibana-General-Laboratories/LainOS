@@ -2,6 +2,8 @@ use std::io::prelude::*;
 use std::io::Cursor;
 use std::path::Path;
 
+use rand;
+
 use vfat::{Shared, VFat, BiosParameterBlock};
 use mbr::{MasterBootRecord, CHS, PartitionEntry};
 use traits::*;

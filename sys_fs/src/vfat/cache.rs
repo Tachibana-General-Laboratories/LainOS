@@ -130,6 +130,10 @@ impl CachedDevice {
         Ok(&entry.data)
     }
 
+    pub fn drop_read_cache(&mut self) {
+        self.cache.retain(|_, v| v.dirty)
+    }
+
     pub fn flush(&mut self) -> io::Result<()> {
         for (&sector, entry) in self.cache.iter_mut().filter(|e| e.1.dirty) {
             self.device.write_sector(sector, &entry.data)?;

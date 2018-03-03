@@ -1,8 +1,7 @@
 #![feature(compiler_builtins_lib, lang_items, asm, pointer_methods)]
 #![feature(core_intrinsics)]
+#![feature(alloc, allocator_api, global_allocator)]
 #![feature(const_fn)]
-#![feature(alloc, allocator_api)]
-#![feature(global_allocator)]
 #![feature(decl_macro)]
 
 //#[macro_use]
@@ -18,29 +17,18 @@ extern crate volatile;
 #[macro_use]
 extern crate log;
 
-extern crate fat32;
+extern crate sys_fs as fat32;
 
-#[cfg(not(test))]
 pub mod console;
-
 pub mod externs;
-#[cfg(not(test))]
 pub mod panic;
-
-#[cfg(not(test))]
 pub mod util;
-
-#[cfg(not(test))]
 pub mod exception;
-#[cfg(not(test))]
 pub mod mmu;
-
-#[cfg(not(test))]
 pub mod pi;
-#[cfg(not(test))]
 pub mod fb;
-#[cfg(not(test))]
 pub mod shell;
+
 //pub mod sd;
 //pub mod sdn;
 //pub mod gles;
@@ -79,10 +67,8 @@ pub static FILE_SYSTEM: fs::FileSystem = fs::FileSystem::uninitialized();
 
 #[cfg(not(test))]
 pub fn init_heap() {
-    // TODO why?
     let heap_start = 0x0F00_0000;
-    let heap_end =   0x1000_0000;
-    let heap_size = heap_end - heap_start;
+    let heap_size = ADDR_1GB - heap_start;
     unsafe {
         ALLOCATOR.init(heap_start, heap_size);
     }
@@ -94,45 +80,31 @@ pub fn init_heap() {
 pub extern "C" fn kernel_main() -> ! {
     init_heap();
 
-    //pi::uart0::Uart0::new().initialize();
+    kprintln!("init console");
 
-    kprintln!("      .  ");
-    kprintln!("    < 0 >");
-    kprintln!("    ./ \\.");
-    kprintln!("");
+    kprintln!("init fs");
+    FILE_SYSTEM.initialize();
 
     unsafe {
         let f: u32 = (1 << 0) | (1 << 1) | (1 << 2);
         asm!("msr cntv_ctl_el0, $0" : : "r"(f) : : "volatile");
+
+        let level: u32;
+        // read the current level from system register
+        asm!("mrs $0, CurrentEL" : "=r" (level) : : : "volatile");
+        kprintln!("Current EL is: 0x{:X} [0x{:X}]", (level >> 2) & 3, level);
     }
 
     let s = String::from("fucking string!");
 
     kprintln!("Hello Rust Kernel world! 0x{:X} {}", 0xDEAD, s);
 
-
-    kprintln!("init fs");
-    FILE_SYSTEM.initialize();
-
-    {
-        use fat32::traits::{FileSystem, Entry};
-        use std::io::Read;
-        let f = FILE_SYSTEM.open("/README.md").unwrap();
-        let mut f = f.into_file().unwrap();
-
-        let mut s = String::new();
-        f.read_to_string(&mut s).unwrap();
-        kprintln!("--------");
-        kprintln!("{}", s);
-        kprintln!("--------");
-    }
-
     if true {
+        kprintln!("init mmu");
+
         unsafe {
             mmu::init();
         }
-
-        kprintln!("enabled mmu");
 
         if false {
             use volatile::*;
@@ -150,13 +122,6 @@ pub extern "C" fn kernel_main() -> ! {
                 uart.send(c as u8);
             }
         }
-    }
-
-    unsafe {
-        let level: u32;
-        // read the current level from system register
-        asm!("mrs $0, CurrentEL" : "=r" (level) : : : "volatile");
-        kprintln!("Current EL is: 0x{:X} [0x{:X}]", (level >> 2) & 3, level);
     }
 
     {
@@ -189,12 +154,16 @@ pub extern "C" fn kernel_main() -> ! {
             fb::font().uprint(&mut fb, 1, 0, "  .  ",  0xFFFFFF, 0x000000);
             fb::font().uprint(&mut fb, 1, 1, "< 0 >",  0xFFFFFF, 0x000000);
             fb::font().uprint(&mut fb, 1, 2, "./ \\.", 0xFFFFFF, 0x000000);
-
         }
         None => kprintln!("Unable to set screen resolution to 1024x768x32"),
     }
 
     //kprintln!("init gles: {:?}", gles::InitV3D());
+
+    kprintln!("      .  ");
+    kprintln!("    < 0 >");
+    kprintln!("    ./ \\.");
+    kprintln!("");
 
     shell::shell("> ")
 }
