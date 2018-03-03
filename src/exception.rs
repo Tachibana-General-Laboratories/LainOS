@@ -19,6 +19,7 @@ pub extern "C" fn exception_handler(kind: u64, esr: u64, elr: u64, spsr: u64, fa
     match esr >> 26 {
         0b000000 => kprint!("Unknown reason"),
         0b000001 => kprint!("Trapped WFI/WFE"),
+        0b000111 => kprint!("Access to SVE/adv SIMD/float"),
         0b001110 => kprint!("Illegal execution"),
         0b010101 => kprint!("System call"),
         0b100000 => kprint!("Instruction abort, lower EL"),

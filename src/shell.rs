@@ -52,7 +52,13 @@ impl<'a> Command<'a> {
 /// never returns: it is perpetually in a shell loop.
 pub fn shell(prefix: &str) -> ! {
     use std::io::Write;
-    kprint!("\n{}", prefix);
+
+    kprintln!("      .  ");
+    kprintln!("    < 0 >");
+    kprintln!("    ./ \\.");
+    kprintln!("");
+
+    kprint!("(/) {}", prefix);
 
     let mut shell = Shell { cwd: PathBuf::from("/") };
 
@@ -74,7 +80,8 @@ pub fn shell(prefix: &str) -> ! {
                     }
                 }
                 buf.truncate(0);
-                kprint!("{}", prefix);
+                let cwd = shell.cwd.to_str().unwrap();
+                kprint!("({}) {}", cwd, prefix);
             }
             127 | 8 => { // DEL | BS
                 if !buf.is_empty() {

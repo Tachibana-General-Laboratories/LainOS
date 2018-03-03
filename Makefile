@@ -9,7 +9,15 @@ LDFLAGS ?= --gc-sections -static -nostdlib -nostartfiles --no-dynamic-linker
 XARGO ?= CARGO_INCREMENTAL=0 RUST_TARGET_PATH="$(shell pwd)" xargo
 
 LD_LAYOUT := ext/layout.ld
-BUILD_DIR := build
+
+BUILD_DIR_DEBUG := target/build_debug
+BUILD_DIR_RELEASE := target/build_release
+
+ifeq ($(DEBUG),1)
+BUILD_DIR := $(BUILD_DIR_DEBUG)
+else
+BUILD_DIR := $(BUILD_DIR_RELEASE)
+endif
 
 RUST_BINARY := $(shell cat Cargo.toml | grep name | cut -d\" -f 2 | tr - _)
 RUST_BUILD_DIR := target/$(TARGET)
@@ -18,7 +26,7 @@ RUST_RELEASE_LIB := $(RUST_BUILD_DIR)/release/lib$(RUST_BINARY).a
 RUST_LIB := $(BUILD_DIR)/$(RUST_BINARY).a
 
 RUST_DEPS = Xargo.toml Cargo.toml build.rs $(LD_LAYOUT) src/*
-EXT_DEPS := build/start.o
+EXT_DEPS := $(BUILD_DIR)/start.o
 
 KERNEL := $(BUILD_DIR)/$(RUST_BINARY)
 
@@ -29,15 +37,12 @@ VPATH = ext
 all: $(KERNEL).img
 
 qemu: all
-	#qemu-system-aarch64 -M raspi3 -serial stdio -kernel $(KERNEL).img   #-d in_asm
-		#-drive file=files/resources/mock1.fat32.img,if=sd,format=raw \
-	#
 	qemu-system-aarch64 -M raspi3 \
+		-m 1024 \
 		-display sdl,gl=on -sdl \
 		-drive file=fs.img,if=sd,format=raw \
 		-serial stdio \
 		-kernel $(KERNEL).img
-	#qemu-system-aarch64 -M raspi3 -kernel $(KERNEL).img   #-d in_asm
 
 test:
 	cargo test
@@ -70,6 +75,7 @@ endif
 
 $(KERNEL).elf: $(EXT_DEPS) $(RUST_LIB)
 	$(CROSS)-ld $(LDFLAGS) $^ -T $(LD_LAYOUT) -o $@
+	$(CROSS)-strip $@
 $(KERNEL).img: $(KERNEL).elf
 	$(CROSS)-objcopy -O binary $< $@
 

@@ -93,6 +93,13 @@ pub unsafe fn init() {
         PT_ISH |      // inner shareable
         PT_MEM);      // normal memory
 
+    ttbr1.l1[0].write(ttbr1.l2.as_ptr() as u64 |    // physical address
+        PT_PAGE |
+        PT_AF |
+        PT_KERNEL |
+        PT_ISH |
+        PT_MEM);
+
     // identity L2, first 2M block
     ttbr0.l2[0].write(ttbr0.l3.as_ptr() as u64 | // physical address
         PT_PAGE |     // we have area in it mapped by pages
@@ -107,6 +114,17 @@ pub unsafe fn init() {
     // skip 0th, as we're about to map it by L3
     for r in 1..512 {
         ttbr0.l2[r].write((r<<21) as u64 |  // physical address
+            PT_BLOCK |    // map 2M block
+            PT_AF |       // accessed flag
+            PT_XN |       // no execute
+            PT_USER |     // non-privileged
+            if r >= b {   // different attributes for device memory
+                PT_OSH | PT_DEV
+            } else {
+                PT_ISH | PT_MEM
+            });
+
+        ttbr1.l2[r].write((r<<21) as u64 |  // physical address
             PT_BLOCK |    // map 2M block
             PT_AF |       // accessed flag
             PT_XN |       // no execute
@@ -133,7 +151,7 @@ pub unsafe fn init() {
             });
     }
 
-    {
+    if false {
         let addr = IO_BASE + 0x00201000;
         ttbr1.write123dev(addr as usize | 0xFFFF_FF80_0000_0000, addr);
     }

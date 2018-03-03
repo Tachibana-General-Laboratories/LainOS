@@ -52,14 +52,12 @@ _start:
     // set up exception handlers
     ldr     x2, =_vectors
     msr     vbar_el1, x2
-    /*
     // change execution level to EL1
     mov     x2, #0x3c4
     msr     spsr_el2, x2
     adr     x2, 5f
     msr     elr_el2, x2
     eret
-    */
 
 5:  mov     sp, x1
 
@@ -70,6 +68,10 @@ _start:
     str     xzr, [x1], #8
     sub     w2, w2, #1
     cbnz    w2, 3b
+
+    // enable FP/SIMD at EL1
+    mov     x0, #3 << 20
+    msr     cpacr_el1, x0
 
     // jump to C code, should not return
 4:  bl      kernel_main

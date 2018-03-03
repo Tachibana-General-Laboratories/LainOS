@@ -49,6 +49,7 @@ use console::{kprint, kprintln};
 static mut ALLOCATOR: LockedHeap = LockedHeap::empty();
 
 const BINARY_START_ADDR: usize = 0x8_0000; // 512kb
+const KERNEL_SPACE: usize = 0xFFFFFF80_00000000;
 
 const ADDR_1MB: usize   = 0x0010_0000;
 const ADDR_2MB: usize   = 0x0020_0000;
@@ -67,10 +68,10 @@ pub static FILE_SYSTEM: fs::FileSystem = fs::FileSystem::uninitialized();
 
 #[cfg(not(test))]
 pub fn init_heap() {
-    let heap_start = 0x0F00_0000;
-    let heap_size = ADDR_1GB - heap_start;
+    let heap_start = KERNEL_SPACE | 0x0F00_0000;
+    let heap_end =   KERNEL_SPACE | 0x1000_0000;
     unsafe {
-        ALLOCATOR.init(heap_start, heap_size);
+        ALLOCATOR.init(heap_start, heap_end - heap_start);
     }
 }
 
@@ -78,12 +79,7 @@ pub fn init_heap() {
 #[inline(never)]
 #[cfg(not(test))]
 pub extern "C" fn kernel_main() -> ! {
-    init_heap();
-
     kprintln!("init console");
-
-    kprintln!("init fs");
-    FILE_SYSTEM.initialize();
 
     unsafe {
         let f: u32 = (1 << 0) | (1 << 1) | (1 << 2);
@@ -95,75 +91,54 @@ pub extern "C" fn kernel_main() -> ! {
         kprintln!("Current EL is: 0x{:X} [0x{:X}]", (level >> 2) & 3, level);
     }
 
-    let s = String::from("fucking string!");
+    kprintln!("init mmu");
+    unsafe { mmu::init(); }
 
-    kprintln!("Hello Rust Kernel world! 0x{:X} {}", 0xDEAD, s);
+    kprintln!("init heap");
+    init_heap();
 
-    if true {
-        kprintln!("init mmu");
+    kprintln!("init fs");
+    FILE_SYSTEM.initialize();
 
-        unsafe {
-            mmu::init();
-        }
-
-        if false {
-            use volatile::*;
-            // generate a Data Abort with a bad address access
-            let r = 0xFFFF_FFFF_FF00_0000 as *mut Volatile<u32>;
-            unsafe { (*r).write(1) }
-        }
-
-        if false {
-            const KERNEL_UART0: usize = 0xFFFFFF80_3F201000;
-
-            let s = format!("fuck {:016X}\n", KERNEL_UART0);
-            let mut uart = unsafe { pi::uart0::Uart0::from_addr(KERNEL_UART0) };
-            for c in s.chars() {
-                uart.send(c as u8);
-            }
-        }
-    }
-
-    {
-        kprint!("Waiting 1000000 CPU cycles (ARM CPU): ");
-        util::wait_cycles(1000000);
-        kprintln!("OK");
-
-        kprint!("Waiting 1000000 microsec (ARM CPU): ");
-        util::wait_msec(1000000);
-        kprintln!("OK");
-
-        kprint!("Waiting 1000000 microsec (BCM System Timer): ");
-        if pi::timer::current_time() == 0 {
-            kprintln!("Not available");
-        } else {
-            pi::timer::spin_sleep_us(1000000);
-            kprintln!("OK");
-        }
-    }
+    test_timers();
 
     kprintln!("init fb");
-
-    match fb::FrameBuffer::new(480, 320, 32) {
-        Some(mut fb) =>  {
-            fb.fill_rgba(0x000000);
-            fb::font().uprint(&mut fb, 13, 5, "Prepare uranus!", 0x00FF00, 0x0000FF);
-            fb::font().uprint(&mut fb, 13, 6, "Prepare uranus!", 0xFF0000, 0x0000FF);
-            fb::font().uprint(&mut fb, 11, 8, "< Prepare uranus! >", 0xFF0000, 0x000000);
-
-            fb::font().uprint(&mut fb, 1, 0, "  .  ",  0xFFFFFF, 0x000000);
-            fb::font().uprint(&mut fb, 1, 1, "< 0 >",  0xFFFFFF, 0x000000);
-            fb::font().uprint(&mut fb, 1, 2, "./ \\.", 0xFFFFFF, 0x000000);
-        }
-        None => kprintln!("Unable to set screen resolution to 1024x768x32"),
-    }
+    init_fb();
 
     //kprintln!("init gles: {:?}", gles::InitV3D());
 
-    kprintln!("      .  ");
-    kprintln!("    < 0 >");
-    kprintln!("    ./ \\.");
-    kprintln!("");
-
     shell::shell("> ")
+}
+
+fn init_fb() {
+    if let Some(mut fb) = fb::FrameBuffer::new(480, 320, 32) {
+        fb.fill_rgba(0x000000);
+        fb::font().uprint(&mut fb, 13, 5, "Prepare uranus!", 0x00FF00, 0x0000FF);
+        fb::font().uprint(&mut fb, 13, 6, "Prepare uranus!", 0xFF0000, 0x0000FF);
+        fb::font().uprint(&mut fb, 11, 8, "< Prepare uranus! >", 0xFF0000, 0x000000);
+
+        fb::font().uprint(&mut fb, 1, 0, "  .  ",  0xFFFFFF, 0x000000);
+        fb::font().uprint(&mut fb, 1, 1, "< 0 >",  0xFFFFFF, 0x000000);
+        fb::font().uprint(&mut fb, 1, 2, "./ \\.", 0xFFFFFF, 0x000000);
+    } else {
+        kprintln!("Unable to set screen resolution");
+    }
+}
+
+fn test_timers() {
+    kprint!("Waiting 1000000 CPU cycles (ARM CPU): ");
+    util::wait_cycles(1000000);
+    kprintln!("OK");
+
+    kprint!("Waiting 1000000 microsec (ARM CPU): ");
+    util::wait_msec(1000000);
+    kprintln!("OK");
+
+    kprint!("Waiting 1000000 microsec (BCM System Timer): ");
+    if pi::timer::current_time() == 0 {
+        kprintln!("Not available");
+    } else {
+        pi::timer::spin_sleep_us(1000000);
+        kprintln!("OK");
+    }
 }
