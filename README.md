@@ -26,36 +26,25 @@ Only cloudabi is available here.
 
 ## Memory layout for AArch64
 
-4KB pages + 3 levels:
+| 4KB pages + 3 levels                | Size  | Use    |
+| ---                                 | ---   | ---    |
+| `0000000000000000-0000007fffffffff` | 512GB | user   |
+| `ffffff8000000000-ffffffffffffffff` | 512GB | kernel |
 
-| Start | End | Size | Use |
-| ---   | --- | ---  | --- |
-| 0000000000000000 | 0000007fffffffff | 512GB | user   |
-| ffffff8000000000 | ffffffffffffffff | 512GB | kernel |
+| 4KB pages + 4 levels                | Size  | Use    |
+| ---                                 | ---   | ---    |
+| `0000000000000000-0000ffffffffffff` | 256TB | user   |
+| `ffff000000000000-ffffffffffffffff` | 256TB | kernel |
 
+| 64KB pages + 2 levels               | Size  | Use    |
+| ---                                 | ---   | ---    |
+| `0000000000000000-000003ffffffffff` | 4TB   | user   |
+| `fffffc0000000000-ffffffffffffffff` | 4TB   | kernel |
 
-4KB pages + 4 levels:
-
-| Start | End | Size | Use |
-| ---   | --- | ---  | --- |
-| 0000000000000000 | 0000ffffffffffff | 256TB | user   |
-| ffff000000000000 | ffffffffffffffff | 256TB | kernel |
-
-
-64KB pages + 2 levels:
-
-| Start | End | Size | Use |
-| ---   | --- | ---  | --- |
-| 0000000000000000 | 000003ffffffffff | 4TB | user   |
-| fffffc0000000000 | ffffffffffffffff | 4TB | kernel |
-
-
-64KB pages + 3 levels:
-
-| Start | End | Size | Use |
-| ---   | --- | ---  | --- |
-| 0000000000000000 | 0000ffffffffffff | 256TB | user   |
-| ffff000000000000 | ffffffffffffffff | 256TB | kernel |
+| 64KB pages + 3 levels               | Size  | Use    |
+| ---                                 | ---   | ---    |
+| `0000000000000000-0000ffffffffffff` | 256TB | user   |
+| `ffff000000000000-ffffffffffffffff` | 256TB | kernel |
 
 ## References
 
