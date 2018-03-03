@@ -76,6 +76,8 @@ const ADDR_512MB: usize = 0x2000_0000;
 const ADDR_1GB: usize   = 0x4000_0000;
 const ADDR_2GB: usize   = 0x8000_0000;
 
+static FILE_SYSTEM: fs::FileSystem = fs::FileSystem::uninitialized();
+
 #[cfg(not(test))]
 pub fn init_heap() {
     // TODO why?
@@ -111,8 +113,7 @@ pub extern "C" fn kernel_main() -> ! {
 
 
     kprintln!("init fs");
-    let fs = fs::FileSystem::uninitialized();
-    fs.initialize();
+    FILE_SYSTEM.initialize();
 
     {
         use fat32::traits::{FileSystem, Entry};
