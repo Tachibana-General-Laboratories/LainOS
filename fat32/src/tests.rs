@@ -1,3 +1,5 @@
+extern crate rand;
+
 use std::io::prelude::*;
 use std::io::Cursor;
 use std::path::Path;
@@ -138,6 +140,7 @@ fn test_vfat_init() {
     vfat_from_resource!("mock1.fat32.img");
     vfat_from_resource!("mock2.fat32.img");
     vfat_from_resource!("mock3.fat32.img");
+    vfat_from_resource!("mock4.fat32.img");
 }
 
 fn hash_entry<T: Entry>(hash: &mut String, entry: &T) -> ::std::fmt::Result {
@@ -199,6 +202,9 @@ fn test_root_entries() {
 
     let hash = hash_dir_from(vfat_from_resource!("mock3.fat32.img"), "/");
     assert_hash_eq!("mock 3 root directory", hash, hash_for!("root-entries-3"));
+
+    let hash = hash_dir_from(vfat_from_resource!("mock4.fat32.img"), "/");
+    assert_hash_eq!("mock 4 root directory", hash, hash_for!("root-entries-4"));
 }
 
 fn hash_dir_recursive<P: AsRef<Path>>(
@@ -243,22 +249,36 @@ fn test_all_dir_entries() {
 
     let hash = hash_dir_recursive_from(vfat_from_resource!("mock3.fat32.img"), "/");
     assert_hash_eq!("mock 3 all dir entries", hash, hash_for!("all-entries-3"));
+
+    let hash = hash_dir_recursive_from(vfat_from_resource!("mock4.fat32.img"), "/");
+    assert_hash_eq!("mock 4 all dir entries", hash, hash_for!("all-entries-4"));
 }
 
 fn hash_file<T: File>(hash: &mut String, mut file: T) -> ::std::fmt::Result {
     use std::fmt::Write;
     use std::collections::hash_map::DefaultHasher;
     use std::hash::Hasher;
+    use tests::rand::distributions::{Sample, Range};
 
+
+    let mut rng = rand::thread_rng();
+    let mut range = Range::new(128, 8192);
     let mut hasher = DefaultHasher::new();
+    let mut bytes_read = 0;
     loop {
-        let mut buffer = [0; 4096];
+        let mut buffer = vec![0; range.sample(&mut rng)];
         match file.read(&mut buffer) {
             Ok(0) => break,
-            Ok(n) => hasher.write(&buffer[..n]),
+            Ok(n) => {
+                hasher.write(&buffer[..n]);
+                bytes_read += n as u64;
+            }
             Err(e) => panic!("failed to read file: {:?}", e)
         }
     }
+
+    assert_eq!(bytes_read, file.size(),
+        "expected to read {} bytes (file size) but read {}", file.size(), bytes_read);
 
     write!(hash, "{}", hasher.finish())
 }
@@ -309,13 +329,19 @@ fn test_mock1_files_recursive() {
 #[test]
 fn test_mock2_files_recursive() {
     let hash = hash_files_recursive_from(vfat_from_resource!("mock2.fat32.img"), "/");
-    assert_hash_eq!("mock 2 file hashes", hash, hash_for!("files-2-3"));
+    assert_hash_eq!("mock 2 file hashes", hash, hash_for!("files-2-3-4"));
 }
 
 #[test]
 fn test_mock3_files_recursive() {
     let hash = hash_files_recursive_from(vfat_from_resource!("mock3.fat32.img"), "/");
-    assert_hash_eq!("mock 3 file hashes", hash, hash_for!("files-2-3"));
+    assert_hash_eq!("mock 3 file hashes", hash, hash_for!("files-2-3-4"));
+}
+
+#[test]
+fn test_mock4_files_recursive() {
+    let hash = hash_files_recursive_from(vfat_from_resource!("mock4.fat32.img"), "/");
+    assert_hash_eq!("mock 4 file hashes", hash, hash_for!("files-2-3-4"));
 }
 
 #[test]

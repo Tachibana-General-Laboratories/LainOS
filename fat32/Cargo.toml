@@ -4,3 +4,4 @@ version = "0.1.0"
 
 [dependencies]
 fnv = "1"
+rand = "0.4"

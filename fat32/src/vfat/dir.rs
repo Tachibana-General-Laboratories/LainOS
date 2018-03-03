@@ -141,7 +141,7 @@ impl VFatDirEntry {
             .map(|&c| c as char)
             .collect();
 
-        if ext.len() == 3 {
+        if ext.len() > 0 {
             name + "." + &ext
         } else {
             name
@@ -233,6 +233,10 @@ impl Iterator for DirIter {
         loop {
             let e = *self.next_dir_entry().and_then(VFatDirEntry::and_end)?;
             self.current += 1;
+
+            if e.is_unused() {
+                continue;
+            }
 
             if e.is_long()  {
                 let s: String = e.long_name().collect();

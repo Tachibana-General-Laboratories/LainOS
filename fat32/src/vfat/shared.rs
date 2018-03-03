@@ -8,7 +8,7 @@ use std::ops::{Deref, DerefMut};
 #[derive(Debug)]
 pub struct Shared<T>(imp::Inner<T>);
 
-#[cfg(target_os = "ros")]
+#[cfg(target_os = "lainos")]
 mod imp {
     use std::rc::Rc;
     use std::sync::Mutex;
@@ -27,11 +27,11 @@ mod imp {
     unsafe impl<T> Send for Shared<T> {}
 }
 
-#[cfg(not(target_os = "ros"))]
+#[cfg(not(target_os = "lainos"))]
 mod imp {
     use std::sync::{Arc, Mutex};
 
-    pub type Inner<T> = ::std::sync::Arc<::std::sync::Mutex<T>>;
+    pub type Inner<T> = Arc<Mutex<T>>;
 
     pub fn new<T>(val: T) -> Inner<T> {
         Arc::new(Mutex::new(val))
