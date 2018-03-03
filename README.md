@@ -26,25 +26,25 @@ Only cloudabi is available here.
 
 ## Memory layout for AArch64
 
-| 4KB pages + 3 levels                | Size  | Use    |
-| ---                                 | ---   | ---    |
-| `0000000000000000-0000007fffffffff` | 512GB | user   |
-| `ffffff8000000000-ffffffffffffffff` | 512GB | kernel |
+| 4KB pages + 3 levels                    | Sizeof  | Use    |
+| ---                                     | ---     | ---    |
+| `00000000_00000000 - 0000007f_ffffffff` | 512GB   | user   |
+| `ffffff80_00000000 - ffffffff_ffffffff` | 512GB   | kernel |
 
-| 4KB pages + 4 levels                | Size  | Use    |
-| ---                                 | ---   | ---    |
-| `0000000000000000-0000ffffffffffff` | 256TB | user   |
-| `ffff000000000000-ffffffffffffffff` | 256TB | kernel |
+| 4KB pages + 4 levels                    | Sizeof  | Use    |
+| ---                                     | ---     | ---    |
+| `00000000_00000000 - 0000ffff_ffffffff` | 256TB   | user   |
+| `ffff0000_00000000 - ffffffff_ffffffff` | 256TB   | kernel |
 
-| 64KB pages + 2 levels               | Size  | Use    |
-| ---                                 | ---   | ---    |
-| `0000000000000000-000003ffffffffff` | 4TB   | user   |
-| `fffffc0000000000-ffffffffffffffff` | 4TB   | kernel |
+| 64KB pages + 2 levels                   | Sizeof  | Use    |
+| ---                                     | ---     | ---    |
+| `00000000_00000000 - 000003ff_ffffffff` | 4TB     | user   |
+| `fffffc00_00000000 - ffffffff_ffffffff` | 4TB     | kernel |
 
-| 64KB pages + 3 levels               | Size  | Use    |
-| ---                                 | ---   | ---    |
-| `0000000000000000-0000ffffffffffff` | 256TB | user   |
-| `ffff000000000000-ffffffffffffffff` | 256TB | kernel |
+| 64KB pages + 3 levels                   | Sizeof  | Use    |
+| ---                                     | ---     | ---    |
+| `00000000_00000000 - 0000ffff_ffffffff` | 256TB   | user   |
+| `ffff0000_00000000 - ffffffff_ffffffff` | 256TB   | kernel |
 
 ## References
 
