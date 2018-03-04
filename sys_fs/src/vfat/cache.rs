@@ -1,5 +1,6 @@
 use std::{io, fmt};
 use std::collections::HashMap;
+use std::collections::hash_map::Entry;
 use fnv::*;
 
 use traits::BlockDevice;
@@ -14,7 +15,7 @@ pub struct Partition {
 #[derive(Debug)]
 struct CacheEntry {
     data: Vec<u8>,
-    dirty: bool
+    dirty: bool,
 }
 
 pub struct CachedDevice {
@@ -51,7 +52,7 @@ impl CachedDevice {
         Self {
             device: Box::new(device),
             cache: HashMap::default(),
-            partition: partition
+            partition,
         }
     }
 
@@ -82,8 +83,6 @@ impl CachedDevice {
     ///
     /// Returns an error if there is an error reading the sector from the disk.
     pub fn get_mut(&mut self, sector: u64) -> io::Result<&mut [u8]> {
-        use std::collections::hash_map::Entry;
-
         let (sector, factor) = self.virtual_to_physical(sector);
 
         let cap = self.sector_size() as usize;
@@ -110,8 +109,6 @@ impl CachedDevice {
     ///
     /// Returns an error if there is an error reading the sector from the disk.
     pub fn get(&mut self, sector: u64) -> io::Result<&[u8]> {
-        use std::collections::hash_map::Entry;
-
         let (sector, factor) = self.virtual_to_physical(sector);
 
         let cap = self.sector_size() as usize;
@@ -131,13 +128,27 @@ impl CachedDevice {
     }
 
     pub fn drop_read_cache(&mut self) {
-        self.cache.retain(|_, v| v.dirty)
+        self.cache.retain(|_, v| !v.dirty)
     }
 
-    pub fn flush(&mut self) -> io::Result<()> {
-        for (&sector, entry) in self.cache.iter_mut().filter(|e| e.1.dirty) {
-            self.device.write_sector(sector, &entry.data)?;
-            entry.dirty = false;
+    pub fn sync_sector(&mut self, sector: u64, remove: bool) -> io::Result<()> {
+        let (sector, factor) = self.virtual_to_physical(sector);
+
+        let chunk_size = self.device.sector_size() as usize;
+        if let Entry::Occupied(mut entry) = self.cache.entry(sector) {
+            {
+                let entry = entry.get_mut();
+                if entry.dirty {
+                    let chunks = entry.data.chunks(chunk_size);
+                    for (i, data) in chunks.enumerate() {
+                        self.device.write_sector(sector + i as u64, data)?;
+                    }
+                    entry.dirty = false;
+                }
+            }
+            if remove {
+                entry.remove_entry();
+            }
         }
         Ok(())
     }

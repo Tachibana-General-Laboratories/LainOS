@@ -247,7 +247,6 @@ impl Iterator for DirIter {
                 continue;
             }
 
-
             if self.name.is_empty() {
                 self.name += &e.short_name();
             }

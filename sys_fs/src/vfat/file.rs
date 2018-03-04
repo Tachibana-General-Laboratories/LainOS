@@ -40,7 +40,7 @@ impl io::Seek for File {
         let pos = if offset >= 0 {
             base.checked_add(offset as u64)
         } else {
-            base.checked_sub((offset.wrapping_neg()) as u64)
+            base.checked_sub(offset.wrapping_neg() as u64)
         };
         match pos {
             Some(pos) if pos <= self.size => {

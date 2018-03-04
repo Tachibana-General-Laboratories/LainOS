@@ -127,6 +127,23 @@ impl VFat {
         Ok(buf.len())
     }
 
+    pub fn sync_chain(&mut self, start: Cluster, remove: bool) -> io::Result<()> {
+        use vfat::Status::*;
+        let mut cluster = start;
+        loop {
+            let sector = self.sector(cluster);
+            for i in 0..self.sectors_per_cluster as u64 {
+                self.device.sync_sector(sector + i, remove)?;
+            }
+            match self.fat_entry(cluster)?.status() {
+                Data(next) => cluster = next,
+                Eoc(_) => break,
+                _ => break,
+            }
+        }
+        Ok(())
+    }
+
     /// A method to return a reference to a `FatEntry` for a cluster where the
     /// reference points directly into a cached sector.
     fn fat_entry(&mut self, cluster: Cluster) -> io::Result<&FatEntry> {
@@ -149,16 +166,16 @@ impl<'a> FileSystem for &'a Shared<VFat> {
         let mut root = Dir::root(self.clone());
         for c in path.as_ref().components() {
             match c {
-                Component::RootDir => (),
                 Component::Normal(p) => {
                     match root.find(p)? {
                         file @ Entry::File(_) => return Ok(file),
                         Entry::Dir(dir) => root = dir,
                     }
                 }
-                Component::Prefix(_) => unimplemented!(),
-                Component::CurDir => unimplemented!(),
+                Component::RootDir => (),
+                Component::CurDir => (),
                 Component::ParentDir => unimplemented!(),
+                Component::Prefix(_) => return Err(io::Error::new(io::ErrorKind::InvalidInput, "prefix don't support")),
             }
         }
         Ok(Entry::Dir(root))
