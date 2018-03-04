@@ -1,9 +1,25 @@
 use console::{kprint, kprintln};
+use volatile::prelude::*;
+use volatile::Volatile;
+
+#[repr(C)]
+#[derive(Debug)]
+struct State {
+    spsr: Volatile<u64>,
+    elr: Volatile<u64>,
+    //reg: [Volatile<u64>; 32],
+    reg: [u64; 32],
+}
 
 // common exception handler
 #[no_mangle]
 #[inline(never)]
-pub extern "C" fn exception_handler(kind: u64, esr: u64, elr: u64, spsr: u64, far: u64) -> ! {
+pub extern "C" fn exception_handler(kind: u64, esr: u64, elr: u64, spsr: u64, far: u64, sp: u64) {
+    kprintln!("sp: 0x{:016x}", sp as usize);
+    let mut state = unsafe { &mut *((sp) as *mut State) };
+
+    //kprintln!("{:#?}", state);
+
     // print out interruption type
     match kind {
         0 => kprint!("Synchronous"),
@@ -53,5 +69,18 @@ pub extern "C" fn exception_handler(kind: u64, esr: u64, elr: u64, spsr: u64, fa
     kprintln!("  FAR_EL1 {:016X}", far);
 
     // no return from exception for now
-    loop {}
+    //loop {}
+    if kind != 0 && kind != 4 {
+        loop {}
+    } else {
+        kprintln!("fuck1 {:?}", state.reg);
+
+        unsafe {
+            for i in 0..7 {
+                ::std::ptr::write_volatile(&mut state.reg[i], 1488)
+            }
+        }
+
+        kprintln!("fuck2 {:?}", state.reg);
+    }
 }

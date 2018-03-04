@@ -77,6 +77,20 @@ pub fn init_heap() {
 
 #[no_mangle]
 #[inline(never)]
+pub extern "C" fn _sig() -> u64 {
+    //kprintln!("sig start");
+    unsafe {
+        // disable fiq
+        //asm!("msr daifset, #0xF" : : : "memory" : "volatile");
+        asm!("mov x3, #12345" :::: "volatile");
+        let i: u64;
+        asm!("svc #0;mov $0, x3" : "=r"(i) : : : "volatile");
+        i
+    }
+}
+
+#[no_mangle]
+#[inline(never)]
 #[cfg(not(test))]
 pub extern "C" fn kernel_main() -> ! {
     kprintln!("init console");
@@ -89,6 +103,13 @@ pub extern "C" fn kernel_main() -> ! {
         // read the current level from system register
         asm!("mrs $0, CurrentEL" : "=r" (level) : : : "volatile");
         kprintln!("Current EL is: 0x{:X} [0x{:X}]", (level >> 2) & 3, level);
+    }
+
+    if false {
+        // not working
+        // in qemu only?
+        let s: u64 = _sig();
+        kprintln!("from sig: {}", s);
     }
 
     kprintln!("init mmu");

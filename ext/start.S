@@ -50,7 +50,7 @@ _start:
     movk    x2, #0x30d0, lsl #16
     msr     sctlr_el1, x2
     // set up exception handlers
-    ldr     x2, =_vectors
+    ldr     x2, =_vector_table
     msr     vbar_el1, x2
     // change execution level to EL1
     mov     x2, #0x3c4
@@ -78,45 +78,152 @@ _start:
     // for failsafe, halt this core too
     b       1b
 
-    // important, code has to be properly aligned
+
+
+// how about it:
+//  32 bit float registers: S0 ... S31
+//  64 bit double registers: D0 ... D31
+//  128 bit SIMD registers: V0 ... V31
+
+//  V0 - V7 arguments and return value
+//  D8 - D15 callee saved registers
+//  V16 - V31 temporary registers
+// Bits 64:128 not saved on V8-V15
+
+//  X0 - X7 arguments and return value
+//  X8 indirect result (struct) location
+//  X9 - X15 temporary registers
+//  X16 - X17 intra-call-use registers (PLT, linker)
+//  X18 platform specific use (TLS)
+//  X19 - X28 callee-saved registers
+//  X29 frame pointer
+//  X30 link register
+//  SP stack pointer (XZR)
+
+.macro      start_handler el
+    stp     x29, x30, [sp, #-16]!
+    stp     x27, x28, [sp, #-16]!
+    stp     x25, x26, [sp, #-16]!
+    stp     x23, x24, [sp, #-16]!
+    stp     x21, x22, [sp, #-16]!
+    stp     x19, x20, [sp, #-16]!
+    stp     x17, x18, [sp, #-16]!
+    stp     x15, x16, [sp, #-16]!
+    stp     x13, x14, [sp, #-16]!
+    stp     x11, x12, [sp, #-16]!
+    stp     x9, x10, [sp, #-16]!
+    stp     x7, x8, [sp, #-16]!
+    stp     x5, x6, [sp, #-16]!
+    stp     x3, x4, [sp, #-16]!
+    stp     x1, x2, [sp, #-16]!
+    str     x0, [sp, #-16]!
+
+    mrs     x1, spsr_\el
+    mrs     x2, elr_\el
+    stp     x1, x2, [sp, #-16]!
+.endm
+
+
+.macro      end_handler el
+    ldp     x1, x2, [sp], #16
+    msr     elr_\el, x2
+    msr     spsr_\el, x1
+
+    ldr     x0, [sp], #16
+    ldp     x1, x2, [sp], #16
+    ldp     x3, x4, [sp], #16
+    ldp     x5, x6, [sp], #16
+    ldp     x7, x8, [sp], #16
+    ldp     x9, x10, [sp], #16
+    ldp     x11, x12, [sp], #16
+    ldp     x13, x14, [sp], #16
+    ldp     x15, x16, [sp], #16
+    ldp     x17, x18, [sp], #16
+    ldp     x19, x20, [sp], #16
+    ldp     x21, x22, [sp], #16
+    ldp     x23, x24, [sp], #16
+    ldp     x25, x26, [sp], #16
+    ldp     x27, x28, [sp], #16
+    ldp     x29, x30, [sp], #16
+.endm
+
+.macro      except num
+.balign 0x80
+    start_handler el1
+
+    mov     x0, \num
+    mrs     x1, esr_el1
+    mrs     x2, elr_el1
+    mrs     x3, spsr_el1
+    mrs     x4, far_el1
+    mov     x5, sp
+    b       exception_handler
+
+    end_handler el1
+    msr daifset, #0xf
+    eret
+.endm
+
+
+_xh0: except #0
+_xh1: except #1
+_xh2: except #2
+_xh3: except #3
+
+_xh4: except #4
+_xh5: except #5
+_xh6: except #6
+_xh7: except #7
+
+hang:
+    b hang
+.balign 4
+.ltorg // Tell assembler ltorg data for code above can go here
+
+_eret:
+    eret
+.balign 4
+.ltorg // Tell assembler ltorg data for code above can go here
+
+
+
+// macro to align handlers every 0x80 bytes
+.macro      vector handler
+.balign 0x80
+    b       \handler
+.endm
+
+.balign 0x800
+.globl      _vector_table
+_vector_table:
+    // from current EL with sp_el0
+    vector  _xh0            // synchronous
+    vector  _xh1            // IRQ
+    vector  _xh2            // FIQ
+    vector  _xh3            // SError
+
+    // from current EL with sp_elx, x != 0
+    vector  _xh4           // Synchronous
+    vector  _xh5           // IRQ
+    vector  _xh6           // FIQ
+    vector  _xh7           // SError
+
+    // from lower EL, target EL minus 1 is AArch64
+    vector  hang            // Synchronous
+    vector  hang            // IRQ
+    vector  hang            // FIQ
+    vector  hang            // SError
+
+    // from lower EL, target EL minus 1 is AArch32
+    vector  hang            // Synchronous
+    vector  hang            // IRQ
+    vector  hang            // FIQ
+    vector  hang            // SError
+
+
+/*
     .align 11
 _vectors:
     // synchronous
     .align  7
-    mov     x0, #0
-    mrs     x1, esr_el1
-    mrs     x2, elr_el1
-    mrs     x3, spsr_el1
-    mrs     x4, far_el1
-    b       exception_handler
-    eret
-
-    // IRQ
-    .align  7
-    mov     x0, #1
-    mrs     x1, esr_el1
-    mrs     x2, elr_el1
-    mrs     x3, spsr_el1
-    mrs     x4, far_el1
-    b       exception_handler
-    eret
-
-    // FIQ
-    .align  7
-    mov     x0, #2
-    mrs     x1, esr_el1
-    mrs     x2, elr_el1
-    mrs     x3, spsr_el1
-    mrs     x4, far_el1
-    b       exception_handler
-    eret
-
-    // SError
-    .align  7
-    mov     x0, #3
-    mrs     x1, esr_el1
-    mrs     x2, elr_el1
-    mrs     x3, spsr_el1
-    mrs     x4, far_el1
-    b       exception_handler
-    eret
+*/
