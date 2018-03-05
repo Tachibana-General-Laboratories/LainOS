@@ -19,6 +19,7 @@ _start:
     mrs     x0, CurrentEL
     and     x0, x0, #12 // clear reserved bits
 
+
     // running at EL3?
     cmp     x0, #12
     bne     5f
@@ -49,9 +50,6 @@ _start:
     mov     x2, #0x0800
     movk    x2, #0x30d0, lsl #16
     msr     sctlr_el1, x2
-    // set up exception handlers
-    ldr     x2, =_vector_table
-    msr     vbar_el1, x2
     // change execution level to EL1
     mov     x2, #0x3c4
     msr     spsr_el2, x2
@@ -60,6 +58,10 @@ _start:
     eret
 
 5:  mov     sp, x1
+
+    // set up exception handlers
+    ldr     x2, =_vector_table
+    msr     vbar_el1, x2
 
     // clear bss
     ldr     x1, =__bss_start
@@ -100,7 +102,7 @@ _start:
 //  X30 link register
 //  SP stack pointer (XZR)
 
-.macro      start_handler el
+.macro      start_handler el=el1
     stp     x29, x30, [sp, #-16]!
     stp     x27, x28, [sp, #-16]!
     stp     x25, x26, [sp, #-16]!
@@ -111,30 +113,32 @@ _start:
     stp     x15, x16, [sp, #-16]!
     stp     x13, x14, [sp, #-16]!
     stp     x11, x12, [sp, #-16]!
-    stp     x9, x10, [sp, #-16]!
-    stp     x7, x8, [sp, #-16]!
-    stp     x5, x6, [sp, #-16]!
-    stp     x3, x4, [sp, #-16]!
-    stp     x1, x2, [sp, #-16]!
-    str     x0, [sp, #-16]!
+    stp     x9 , x10, [sp, #-16]!
+    stp     x7 , x8 , [sp, #-16]!
+    stp     x5 , x6 , [sp, #-16]!
+    stp     x3 , x4 , [sp, #-16]!
+    stp     x1 , x2 , [sp, #-16]!
+    str          x0 , [sp, #-16]!
 
     mrs     x1, spsr_\el
     mrs     x2, elr_\el
-    stp     x1, x2, [sp, #-16]!
+
+    stp     x1 , x2 , [sp, #-16]!
 .endm
 
 
-.macro      end_handler el
-    ldp     x1, x2, [sp], #16
+.macro      end_handler el=el1
+    ldp      x1,  x2, [sp], #16
+
     msr     elr_\el, x2
     msr     spsr_\el, x1
 
-    ldr     x0, [sp], #16
-    ldp     x1, x2, [sp], #16
-    ldp     x3, x4, [sp], #16
-    ldp     x5, x6, [sp], #16
-    ldp     x7, x8, [sp], #16
-    ldp     x9, x10, [sp], #16
+    ldr          x0 , [sp], #16
+    ldp     x1 , x2 , [sp], #16
+    ldp     x3 , x4 , [sp], #16
+    ldp     x5 , x6 , [sp], #16
+    ldp     x7 , x8 , [sp], #16
+    ldp     x9 , x10, [sp], #16
     ldp     x11, x12, [sp], #16
     ldp     x13, x14, [sp], #16
     ldp     x15, x16, [sp], #16
@@ -148,39 +152,46 @@ _start:
 .endm
 
 .macro      except num
-.balign 0x80
-    start_handler el1
-
+    start_handler
     mov     x0, \num
     mrs     x1, esr_el1
     mrs     x2, elr_el1
     mrs     x3, spsr_el1
     mrs     x4, far_el1
     mov     x5, sp
-    b       exception_handler
-
-    end_handler el1
-    msr daifset, #0xf
+    bl      exception_handler
+    end_handler
     eret
 .endm
 
 
-_xh0: except #0
-_xh1: except #1
-_xh2: except #2
-_xh3: except #3
+.global xsvc
+xsvc:
+    #mov x8, #666
+    svc #0
+    ret
 
-_xh4: except #4
-_xh5: except #5
-_xh6: except #6
-_xh7: except #7
+_xh0: except #0x0
+_xh1: except #0x1
+_xh2: except #0x2
+_xh3: except #0x3
+
+_xh4: except #0x4
+_xh5: except #0x5
+_xh6: except #0x6
+_xh7: except #0x7
+
+_xh8: except #0x8
+_xh9: except #0x9
+_xhA: except #0xA
+_xhB: except #0xB
 
 hang:
     b hang
 .balign 4
 .ltorg // Tell assembler ltorg data for code above can go here
 
-_eret:
+_ert:
     eret
 .balign 4
 .ltorg // Tell assembler ltorg data for code above can go here
@@ -193,37 +204,29 @@ _eret:
     b       \handler
 .endm
 
-.balign 0x800
 .globl      _vector_table
+.balign 0x800
 _vector_table:
     // from current EL with sp_el0
-    vector  _xh0            // synchronous
-    vector  _xh1            // IRQ
-    vector  _xh2            // FIQ
-    vector  _xh3            // SError
+    vector  _xh0    // synchronous
+    vector  _xh1    // IRQ
+    vector  _xh2    // FIQ
+    vector  _xh3    // SError
 
     // from current EL with sp_elx, x != 0
-    vector  _xh4           // Synchronous
-    vector  _xh5           // IRQ
-    vector  _xh6           // FIQ
-    vector  _xh7           // SError
+    vector  _xh4    // Synchronous
+    vector  _xh5    // IRQ
+    vector  _xh6    // FIQ
+    vector  _xh7    // SError
 
     // from lower EL, target EL minus 1 is AArch64
-    vector  hang            // Synchronous
-    vector  hang            // IRQ
-    vector  hang            // FIQ
-    vector  hang            // SError
+    vector  _xh8    // Synchronous
+    vector  _xh9    // IRQ
+    vector  _xhA    // FIQ
+    vector  _xhB    // SError
 
     // from lower EL, target EL minus 1 is AArch32
-    vector  hang            // Synchronous
-    vector  hang            // IRQ
-    vector  hang            // FIQ
-    vector  hang            // SError
-
-
-/*
-    .align 11
-_vectors:
-    // synchronous
-    .align  7
-*/
+    vector  _ert    // Synchronous
+    vector  _ert    // IRQ
+    vector  _ert    // FIQ
+    vector  _ert    // SError

@@ -68,65 +68,82 @@ pub static FILE_SYSTEM: fs::FileSystem = fs::FileSystem::uninitialized();
 
 #[cfg(not(test))]
 pub fn init_heap() {
-    let heap_start = KERNEL_SPACE | 0x0F00_0000;
-    let heap_end =   KERNEL_SPACE | 0x1000_0000;
+    let heap_start = 0x0F00_0000;
+    let heap_end =   0x1000_0000;
     unsafe {
         ALLOCATOR.init(heap_start, heap_end - heap_start);
     }
 }
 
+extern "C" {
+    fn xsvc(a: u64, b: u64, c: u64, d: u64, ) -> u64;
+}
+
 #[no_mangle]
 #[inline(never)]
-pub extern "C" fn _sig() -> u64 {
-    //kprintln!("sig start");
-    unsafe {
-        // disable fiq
-        //asm!("msr daifset, #0xF" : : : "memory" : "volatile");
-        asm!("mov x3, #12345" :::: "volatile");
-        let i: u64;
-        asm!("svc #0;mov $0, x3" : "=r"(i) : : : "volatile");
-        i
+#[cfg(not(test))]
+pub unsafe extern "C" fn el0_main() -> ! {
+    for _ in 0..4 {
+        let v = xsvc(111, 222, 333, 444);
+        kprintln!("fuck you shit: {}", v);
+        kprintln!("im a bear suite");
+
+        /*
+        let level: u32;
+        asm!("mrs $0, CurrentEL" : "=r" (level) : : : "volatile");
+        kprintln!("im a bear suite: 0x{:X} [0x{:X}]", (level >> 2) & 3, level);
+        */
     }
+
+    loop {}
 }
 
 #[no_mangle]
 #[inline(never)]
 #[cfg(not(test))]
 pub extern "C" fn kernel_main() -> ! {
-    kprintln!("init console");
+    kprintln!("start kernel main");
+
+    init_logger().unwrap();
 
     unsafe {
-        let f: u32 = (1 << 0) | (1 << 1) | (1 << 2);
-        asm!("msr cntv_ctl_el0, $0" : : "r"(f) : : "volatile");
+        //let f: u32 = (1 << 0) | (1 << 1) | (1 << 2);
+        //asm!("msr cntv_ctl_el0, $0" : : "r"(f) : : "volatile");
 
         let level: u32;
         // read the current level from system register
         asm!("mrs $0, CurrentEL" : "=r" (level) : : : "volatile");
-        kprintln!("Current EL is: 0x{:X} [0x{:X}]", (level >> 2) & 3, level);
+        debug!("Current EL is: 0x{:X} [0x{:X}]", (level >> 2) & 3, level);
     }
 
-    if false {
-        // not working
-        // in qemu only?
-        let s: u64 = _sig();
-        kprintln!("from sig: {}", s);
-    }
-
-    kprintln!("init mmu");
+    info!("init mmu");
     unsafe { mmu::init(); }
 
-    kprintln!("init heap");
+    info!("init heap");
     init_heap();
 
-    kprintln!("init fs");
+    info!("init fs");
     FILE_SYSTEM.initialize();
 
     test_timers();
 
-    kprintln!("init fb");
-    init_fb();
+    //info!("init gles: {:?}", gles::InitV3D());
 
-    //kprintln!("init gles: {:?}", gles::InitV3D());
+    if true {
+        unsafe {
+            //mov x2, #0x3c0
+            asm!("
+            mov x1, $0;
+            msr elr_el1, x1;
+            mov x1, #0;
+            msr spsr_el1, x1;
+            eret;
+            " : : "r" (el0_main as *const ()) : : "volatile");
+        }
+    }
+
+    info!("init fb");
+    init_fb();
 
     shell::shell("> ")
 }
@@ -142,24 +159,58 @@ fn init_fb() {
         fb::font().uprint(&mut fb, 1, 1, "< 0 >",  0xFFFFFF, 0x000000);
         fb::font().uprint(&mut fb, 1, 2, "./ \\.", 0xFFFFFF, 0x000000);
     } else {
-        kprintln!("Unable to set screen resolution");
+        warn!("Unable to set screen resolution");
     }
 }
 
 fn test_timers() {
-    kprint!("Waiting 1000000 CPU cycles (ARM CPU): ");
+    debug!("Waiting 1000000 CPU cycles (ARM CPU): ");
     util::wait_cycles(1000000);
-    kprintln!("OK");
+    debug!("OK");
 
-    kprint!("Waiting 1000000 microsec (ARM CPU): ");
+    debug!("Waiting 1000000 microsec (ARM CPU): ");
     util::wait_msec(1000000);
-    kprintln!("OK");
+    debug!("OK");
 
-    kprint!("Waiting 1000000 microsec (BCM System Timer): ");
+    debug!("Waiting 1000000 microsec (BCM System Timer): ");
     if pi::timer::current_time() == 0 {
-        kprintln!("Not available");
+        debug!("Not available");
     } else {
         pi::timer::spin_sleep_us(1000000);
-        kprintln!("OK");
+        debug!("OK");
     }
+}
+
+
+use log::{Record, Level, Metadata};
+use log::{SetLoggerError, LevelFilter};
+
+struct SimpleLogger;
+
+impl log::Log for SimpleLogger {
+    fn enabled(&self, metadata: &Metadata) -> bool {
+        //metadata.level() <= Level::Info
+        true
+    }
+
+    fn log(&self, record: &Record) {
+        if !self.enabled(record.metadata()) {
+            return;
+        }
+        kprintln!("{: >20}:{: <4} {:>5} -- {}",
+            record.file().unwrap_or(""),
+            record.line().unwrap_or(0),
+            record.level(),
+            record.args(),
+        );
+    }
+
+    fn flush(&self) {}
+}
+
+static LOGGER: SimpleLogger = SimpleLogger;
+
+pub fn init_logger() -> Result<(), SetLoggerError> {
+    log::set_max_level(log::LevelFilter::Trace);
+    log::set_logger(&LOGGER)
 }

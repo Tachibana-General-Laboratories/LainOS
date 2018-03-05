@@ -177,7 +177,6 @@ impl Shell {
     }
 
     fn cd(&mut self, args: StackVec<&str>) {
-        // TODO: "." and ".." support
         if args.len() == 1 {
             self.cwd = PathBuf::from("/");
         } else {

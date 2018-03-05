@@ -128,7 +128,7 @@ pub unsafe fn init() {
             PT_BLOCK |    // map 2M block
             PT_AF |       // accessed flag
             PT_XN |       // no execute
-            PT_USER |     // non-privileged
+            PT_KERNEL |     // non-privileged
             if r >= b {   // different attributes for device memory
                 PT_OSH | PT_DEV
             } else {
@@ -141,7 +141,7 @@ pub unsafe fn init() {
         ttbr0.l3[r as usize].write((r * PAGESIZE as u64) |   // physical address
             PT_PAGE |     // map 4k
             PT_AF |       // accessed flag
-            PT_KERNEL |   // non-privileged
+            PT_USER |   // non-privileged
             PT_ISH |      // inner shareable
             // different for code and data
             if r < 0x80 || r > (_data as u64) / PAGESIZE as u64 {

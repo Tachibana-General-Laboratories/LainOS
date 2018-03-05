@@ -15,18 +15,17 @@ struct State {
 #[no_mangle]
 #[inline(never)]
 pub extern "C" fn exception_handler(kind: u64, esr: u64, elr: u64, spsr: u64, far: u64, sp: u64) {
-    kprintln!("sp: 0x{:016x}", sp as usize);
     let mut state = unsafe { &mut *((sp) as *mut State) };
 
-    //kprintln!("{:#?}", state);
+    warn!("IT'S A TRAP!");
 
     // print out interruption type
-    match kind {
-        0 => kprint!("Synchronous"),
-        1 => kprint!("IRQ"),
-        2 => kprint!("FIQ"),
-        3 => kprint!("SError"),
-        v => kprint!("unknown [{}]", v),
+    match kind & 3 {
+        0 => kprint!("!!! Synchronous {}", kind),
+        1 => kprint!("!!! IRQ {}", kind),
+        2 => kprint!("!!! FIQ {}", kind),
+        3 => kprint!("!!! SError {}", kind),
+        _ => unreachable!(),
     }
 
     kprint!(": ");
@@ -63,24 +62,33 @@ pub extern "C" fn exception_handler(kind: u64, esr: u64, elr: u64, spsr: u64, fa
     kprintln!("");
 
     // dump registers
-    kprintln!("  ESR_EL1 {:016X}", esr);
-    kprintln!("  ELR_EL1 {:016X}", elr);
-    kprintln!(" SPSR_EL1 {:016X}", spsr);
-    kprintln!("  FAR_EL1 {:016X}", far);
+    /*
+    debug!("  ESR_EL1 {:016X}", esr);
+    debug!("  ELR_EL1 {:016X}", elr);
+    debug!(" SPSR_EL1 {:016X}", spsr);
+    debug!("  FAR_EL1 {:016X}", far);
+    */
+
+    debug!("reg el1:  ESR {:016X}  ELR {:016X} SPSR {:016X}  FAR {:016X}", esr, elr, spsr, far);
 
     // no return from exception for now
     //loop {}
-    if kind != 0 && kind != 4 {
+    if kind != 8 {
         loop {}
     } else {
-        kprintln!("fuck1 {:?}", state.reg);
+        debug!("{:?}", state.reg);
 
         unsafe {
-            for i in 0..7 {
+            for i in 0..1 {
                 ::std::ptr::write_volatile(&mut state.reg[i], 1488)
             }
         }
+        //let v = state.elr.read();
+        //state.elr.write(v + 8);
 
-        kprintln!("fuck2 {:?}", state.reg);
+        debug!("state spsr: {:016X}  elr: {:016X}", state.spsr.read(), state.elr.read());
+        debug!("{:?}", state.reg);
     }
+
+    return;
 }
