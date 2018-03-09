@@ -1,8 +1,8 @@
 use std::io;
 use std::fmt;
 
-//use pi::uart::MiniUart;
-use pi::uart0::Uart0 as MiniUart;
+use pi::uart::MiniUart;
+//use pi::uart0::Uart0 as MiniUart;
 
 use spin::Mutex;
 
@@ -21,7 +21,7 @@ impl Console {
     #[inline]
     fn initialize(&mut self) {
         let mut u = MiniUart::new();
-        u.initialize();
+        //u.initialize();
         self.inner = Some(u);
     }
 
@@ -39,12 +39,12 @@ impl Console {
 
     /// Reads a byte from the UART device, blocking until a byte is available.
     pub fn read_byte(&mut self) -> u8 {
-        self.inner().receive()
+        self.inner().read_byte()
     }
 
     /// Writes the byte `byte` to the UART device.
     pub fn write_byte(&mut self, byte: u8) {
-        self.inner().send(byte)
+        self.inner().write_byte(byte)
     }
 }
 
@@ -76,9 +76,9 @@ impl fmt::Write for Console {
         for c in s.chars() {
             // convert newline to carrige return + newline
             if c == '\n' {
-                uart.send(b'\r');
+                uart.write_byte(b'\r');
             }
-            uart.send(c as u8)
+            uart.write_byte(c as u8)
         }
         Ok(())
     }

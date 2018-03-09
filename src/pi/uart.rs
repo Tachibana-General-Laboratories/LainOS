@@ -69,10 +69,10 @@ impl MiniUart {
             let mut pin = Gpio::new(pin).into_alt(gpio::Function::Alt0);
         }
 
-        /*Self {
+        Self {
             registers, timeout: None,
-        }*/
-        unimplemented!()
+        }
+        //unimplemented!()
     }
 
     /// Set the read timeout to `milliseconds` milliseconds.
@@ -83,7 +83,15 @@ impl MiniUart {
     /// Write the byte `byte`. This method blocks until there is space available
     /// in the output FIFO.
     pub fn write_byte(&mut self, byte: u8) {
-        unimplemented!()
+        //unimplemented!()
+
+        // wait until we can send
+        while {
+            unsafe { asm!("nop" ::: "volatile"); }
+            self.registers.LSR.read() & 0x20 != 0
+        } {}
+        // write the character to the buffer
+        self.registers.IO.write(byte);
     }
 
     /// Returns `true` if there is at least one byte ready to be read. If this
@@ -107,7 +115,15 @@ impl MiniUart {
 
     /// Reads a byte. Blocks indefinitely until a byte is ready to be read.
     pub fn read_byte(&mut self) -> u8 {
-        unimplemented!()
+        //unimplemented!()
+
+        // wait until something is in the buffer
+        while {
+            unsafe { asm!("nop" ::: "volatile"); }
+            self.registers.LSR.read() & 0x01 != 0
+        } {}
+        // read it and return 
+        self.registers.IO.read()
     }
 }
 

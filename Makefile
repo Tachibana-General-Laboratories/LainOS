@@ -39,8 +39,21 @@ all: $(KERNEL).img
 qemu: all
 	qemu-system-aarch64 -M raspi3 \
 		-m 1024 \
+		-smp 4 \
+		-accel tcg,thread=multi \
 		-display sdl,gl=on -sdl \
 		-drive file=fs.img,if=sd,format=raw \
+		-serial stdio \
+		-kernel $(KERNEL).img
+
+qemu2: all
+	sudo qemu-system-aarch64 -M raspi3 \
+		-m 1024 \
+		-smp 4 \
+		-accel tcg,thread=multi \
+		-display sdl,gl=on -sdl \
+		-drive file=fs.img,if=sd,format=raw \
+		-serial /dev/tty5 \
 		-serial stdio \
 		-kernel $(KERNEL).img
 

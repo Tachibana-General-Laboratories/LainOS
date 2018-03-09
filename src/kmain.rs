@@ -68,8 +68,8 @@ pub static FILE_SYSTEM: fs::FileSystem = fs::FileSystem::uninitialized();
 
 #[cfg(not(test))]
 pub fn init_heap() {
-    let heap_start = 0x0F00_0000;
-    let heap_end =   0x1000_0000;
+    let heap_start = KERNEL_SPACE | 0x0F00_0000;
+    let heap_end =   KERNEL_SPACE | 0x1000_0000;
     unsafe {
         ALLOCATOR.init(heap_start, heap_end - heap_start);
     }
@@ -87,22 +87,58 @@ pub unsafe extern "C" fn el0_main() -> ! {
         let v = xsvc(111, 222, 333, 444);
         kprintln!("fuck you shit: {}", v);
         kprintln!("im a bear suite");
-
-        /*
-        let level: u32;
-        asm!("mrs $0, CurrentEL" : "=r" (level) : : : "volatile");
-        kprintln!("im a bear suite: 0x{:X} [0x{:X}]", (level >> 2) & 3, level);
-        */
     }
 
-    loop {}
+    info!("init fb");
+    init_fb();
+
+    shell::shell("> ")
+}
+
+fn blink() {
+    const GPIO_BASE: usize = 0x3F000000 + 0x200000;
+
+    const GPIO_FSEL1: *mut u32 = (GPIO_BASE + 0x04) as *mut u32;
+    const GPIO_SET0: *mut u32 = (GPIO_BASE + 0x1C) as *mut u32;
+    const GPIO_CLR0: *mut u32 = (GPIO_BASE + 0x28) as *mut u32;
+
+    #[inline(never)]
+    fn spin_sleep_ms(ms: usize) {
+        for _ in 0..(ms * 600) {
+            unsafe { asm!("nop" :::: "volatile"); }
+        }
+    }
+
+    unsafe {
+        GPIO_FSEL1.write_volatile(0b001 << 18);
+
+        loop {
+            GPIO_SET0.write_volatile(1 << 16);
+            spin_sleep_ms(1000);
+
+            GPIO_CLR0.write_volatile(1 << 16);
+            spin_sleep_ms(1000);
+        }
+    }
+
 }
 
 #[no_mangle]
 #[inline(never)]
 #[cfg(not(test))]
-pub extern "C" fn kernel_main() -> ! {
-    kprintln!("start kernel main");
+pub extern "C" fn kernel_main(cpuid: u64) -> ! {
+
+    blink();
+
+
+
+
+    kprintln!("start kernel main at CPU{}", cpuid);
+    if cpuid != 0 {
+        loop {
+            kprintln!("CPU{}", cpuid);
+        }
+    }
 
     init_logger().unwrap();
 
@@ -117,7 +153,7 @@ pub extern "C" fn kernel_main() -> ! {
     }
 
     info!("init mmu");
-    unsafe { mmu::init(); }
+    unsafe { mmu::init_mmu(); }
 
     info!("init heap");
     init_heap();
@@ -131,11 +167,10 @@ pub extern "C" fn kernel_main() -> ! {
 
     if true {
         unsafe {
-            //mov x2, #0x3c0
             asm!("
             mov x1, $0;
             msr elr_el1, x1;
-            mov x1, #0;
+            mov x1, #0x3c0;
             msr spsr_el1, x1;
             eret;
             " : : "r" (el0_main as *const ()) : : "volatile");

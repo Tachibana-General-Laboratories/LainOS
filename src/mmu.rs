@@ -32,7 +32,7 @@ pub const PT_NC: u64 =       2 << 2;      // non-cachable
 // get addresses from linker
 extern "C" {
     static _data: *mut u8;
-    static _end: usize;
+    static _ttbr_start: usize;
 }
 
 struct Table<'a> {
@@ -66,22 +66,24 @@ impl<'a> Table<'a> {
 }
 
 /// Set up page translation tables and enable virtual memory
-pub unsafe fn init() {
+#[no_mangle]
+#[inline(never)]
+pub unsafe extern fn init_mmu() {
     // create MMU translation tables at _end
 
     // user space
     let ttbr0 = {
-        let l1 = _end + PAGESIZE * 0;
-        let l2 = _end + PAGESIZE * 2;
-        let l3 = _end + PAGESIZE * 3;
+        let l1 = _ttbr_start + PAGESIZE * 0;
+        let l2 = _ttbr_start + PAGESIZE * 2;
+        let l3 = _ttbr_start + PAGESIZE * 3;
         Table::new(l1, l2, l3)
     };
 
     // kernel space
     let mut ttbr1 = {
-        let l1 = _end + PAGESIZE * 1;
-        let l2 = _end + PAGESIZE * 4;
-        let l3 = _end + PAGESIZE * 5;
+        let l1 = _ttbr_start + PAGESIZE * 1;
+        let l2 = _ttbr_start + PAGESIZE * 4;
+        let l3 = _ttbr_start + PAGESIZE * 5;
         Table::new(l1, l2, l3)
     };
 
@@ -96,7 +98,8 @@ pub unsafe fn init() {
     ttbr1.l1[0].write(ttbr1.l2.as_ptr() as u64 |    // physical address
         PT_PAGE |
         PT_AF |
-        PT_KERNEL |
+        //PT_KERNEL |
+        PT_USER |
         PT_ISH |
         PT_MEM);
 
@@ -128,7 +131,8 @@ pub unsafe fn init() {
             PT_BLOCK |    // map 2M block
             PT_AF |       // accessed flag
             PT_XN |       // no execute
-            PT_KERNEL |     // non-privileged
+            PT_USER |     // non-privileged
+            //PT_KERNEL |     // non-privileged
             if r >= b {   // different attributes for device memory
                 PT_OSH | PT_DEV
             } else {
@@ -141,7 +145,19 @@ pub unsafe fn init() {
         ttbr0.l3[r as usize].write((r * PAGESIZE as u64) |   // physical address
             PT_PAGE |     // map 4k
             PT_AF |       // accessed flag
-            PT_USER |   // non-privileged
+            PT_USER |     // non-privileged
+            PT_ISH |      // inner shareable
+            // different for code and data
+            if r < 0x80 || r > (_data as u64) / PAGESIZE as u64 {
+                PT_RW|PT_XN
+            } else {
+                PT_RO
+            });
+
+        ttbr1.l3[r as usize].write((r * PAGESIZE as u64) |   // physical address
+            PT_PAGE |     // map 4k
+            PT_AF |       // accessed flag
+            PT_USER |     // non-privileged
             PT_ISH |      // inner shareable
             // different for code and data
             if r < 0x80 || r > (_data as u64) / PAGESIZE as u64 {
@@ -197,18 +213,20 @@ pub unsafe fn init() {
     // TTBR_ENABLE bit not documented, but required
     {
         // lower half, user space
-        let addr = (_end + TTBR_ENABLE) as u64;
+        let addr = (_ttbr_start + TTBR_ENABLE) as u64;
         asm!("msr ttbr0_el1, $0" : : "r" (addr) : : "volatile");
         // upper half, kernel space
-        let addr = (_end + TTBR_ENABLE + PAGESIZE) as u64;
+        let addr = (_ttbr_start + TTBR_ENABLE + PAGESIZE) as u64;
         asm!("msr ttbr1_el1, $0" : : "r" (addr) : : "volatile");
     }
 
     // finally, toggle some bits in system control register to enable page translation
     let mut r: u64;
-    asm!("dsb ish;
-         isb;
-         mrs $0, sctlr_el1" : "=r" (r) : : : "volatile");
+    asm!("
+        dsb ish
+        isb
+        mrs $0, sctlr_el1
+        " : "=r" (r) : : : "volatile");
 
     r |= 0xC00800;    // set mandatory reserved bits
     r &= !((1<<25)  | // clear EE, little endian translation tables

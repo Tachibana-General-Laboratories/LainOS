@@ -72,7 +72,7 @@ impl Uart0 {
     }
 
     /// Send a character
-    pub fn send(&mut self, c: u8) {
+    pub fn write_byte(&mut self, c: u8) {
         // wait until we can send
         util::nop_while(|| self.registers.FR.read() & 0x20 != 0);
         // write the character to the buffer
@@ -80,7 +80,7 @@ impl Uart0 {
     }
 
     /// Receive a character
-    pub fn receive(&self) -> u8 {
+    pub fn read_byte(&self) -> u8 {
         // wait until something is in the buffer
         util::nop_while(|| self.registers.FR.read() & 0x10 != 0);
         // read it and return
@@ -92,7 +92,7 @@ impl io::Read for Uart0 {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         let len = buf.len();
         for b in buf {
-            *b = self.receive();
+            *b = self.read_byte();
         }
         Ok(len)
     }
@@ -102,7 +102,7 @@ impl io::Write for Uart0 {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         let len = buf.len();
         for &b in buf {
-            self.send(b);
+            self.write_byte(b);
         }
         Ok(len)
     }
@@ -110,14 +110,4 @@ impl io::Write for Uart0 {
     fn flush(&mut self) -> io::Result<()> {
         Ok(())
     }
-}
-
-/// Send a character
-pub fn send(c: u8) {
-    Uart0::new().send(c)
-}
-
-/// Receive a character
-pub fn receive() -> u8 {
-    Uart0::new().receive()
 }

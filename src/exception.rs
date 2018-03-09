@@ -1,20 +1,22 @@
 use console::{kprint, kprintln};
 use volatile::prelude::*;
-use volatile::Volatile;
+use volatile::{Volatile, Reserved};
 
 #[repr(C)]
 #[derive(Debug)]
 struct State {
     spsr: Volatile<u64>,
     elr: Volatile<u64>,
-    //reg: [Volatile<u64>; 32],
-    reg: [u64; 32],
+    reg: [Volatile<u64>; 32],
 }
 
 // common exception handler
 #[no_mangle]
 #[inline(never)]
 pub extern "C" fn exception_handler(kind: u64, esr: u64, elr: u64, spsr: u64, far: u64, sp: u64) {
+    let esr = esr as u32;
+    let spsr = spsr as u32;
+
     let mut state = unsafe { &mut *((sp) as *mut State) };
 
     warn!("IT'S A TRAP!");
@@ -30,8 +32,10 @@ pub extern "C" fn exception_handler(kind: u64, esr: u64, elr: u64, spsr: u64, fa
 
     kprint!(": ");
 
+    let ec = esr >> 26;
+
     // decode exception type (some, not all. See ARM DDI0487B_b chapter D10.2.28)
-    match esr >> 26 {
+    match ec {
         0b000000 => kprint!("Unknown reason"),
         0b000001 => kprint!("Trapped WFI/WFE"),
         0b000111 => kprint!("Access to SVE/adv SIMD/float"),
@@ -48,7 +52,7 @@ pub extern "C" fn exception_handler(kind: u64, esr: u64, elr: u64, spsr: u64, fa
     }
 
     // decode data abort cause
-    if esr>>26 == 0b100100 || esr>>26 == 0b100101 {
+    if ec == 0b100100 || ec == 0b100101 {
         kprint!(", ");
         match (esr>>2) & 0x3 {
             0 => kprint!("Address size fault"),
@@ -62,32 +66,14 @@ pub extern "C" fn exception_handler(kind: u64, esr: u64, elr: u64, spsr: u64, fa
     kprintln!("");
 
     // dump registers
-    /*
-    debug!("  ESR_EL1 {:016X}", esr);
-    debug!("  ELR_EL1 {:016X}", elr);
-    debug!(" SPSR_EL1 {:016X}", spsr);
-    debug!("  FAR_EL1 {:016X}", far);
-    */
+    debug!("reg el1:  ESR {:08X}  ELR {:016X} SPSR {:016X}  FAR {:016X}", esr, elr, spsr, far);
 
-    debug!("reg el1:  ESR {:016X}  ELR {:016X} SPSR {:016X}  FAR {:016X}", esr, elr, spsr, far);
-
-    // no return from exception for now
-    //loop {}
     if kind != 8 {
+        // no return from exception for now
         loop {}
     } else {
-        debug!("{:?}", state.reg);
-
-        unsafe {
-            for i in 0..1 {
-                ::std::ptr::write_volatile(&mut state.reg[i], 1488)
-            }
-        }
-        //let v = state.elr.read();
-        //state.elr.write(v + 8);
-
-        debug!("state spsr: {:016X}  elr: {:016X}", state.spsr.read(), state.elr.read());
-        debug!("{:?}", state.reg);
+        let svc_imm = esr as u16;
+        state.reg[0].write(1488);
     }
 
     return;
