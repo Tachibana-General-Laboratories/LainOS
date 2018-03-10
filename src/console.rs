@@ -4,7 +4,7 @@ use std::fmt;
 use pi::uart::MiniUart;
 //use pi::uart0::Uart0 as MiniUart;
 
-use spin::Mutex;
+use mutex::Mutex;
 
 /// A global singleton allowing read/write access to the console.
 pub struct Console {
@@ -20,9 +20,7 @@ impl Console {
     /// Initializes the console if it's not already initialized.
     #[inline]
     fn initialize(&mut self) {
-        let mut u = MiniUart::new();
-        //u.initialize();
-        self.inner = Some(u);
+        self.inner = Some(MiniUart::new());
     }
 
     /// Returns a mutable borrow to the inner `MiniUart`, initializing it as

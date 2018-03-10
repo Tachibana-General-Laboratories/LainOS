@@ -45,14 +45,9 @@ impl Uart0 {
     }
 
     pub unsafe fn from_addr(addr: usize) -> Self {
-        Self {
-            registers: &mut *(addr as *mut Registers),
-        }
-    }
+        let registers = &mut *(addr as *mut Registers);
 
-    /// Set baud rate and characteristics (115200 8N1) and map to GPIO
-    pub fn initialize(&mut self) {
-        self.registers.CR.write(0);         // turn off UART0
+        registers.CR.write(0);         // turn off UART0
 
         // set up clock for consistent divisor values
         mbox::Mailbox::new().tag_message(&[
@@ -64,11 +59,15 @@ impl Uart0 {
             pin.pull(gpio::Pull::Off);
         }
 
-        self.registers.ICR.write(0x7FF);    // clear interrupts
-        self.registers.IBRD.write(2);       // 115200 baud
-        self.registers.FBRD.write(0xB);
-        self.registers.LCRH.write(0b11<<5); // 8n1
-        self.registers.CR.write(0x301);     // enable Tx, Rx, FIFO
+        registers.ICR.write(0x7FF);    // clear interrupts
+        registers.IBRD.write(2);       // 115200 baud
+        registers.FBRD.write(0xB);
+        registers.LCRH.write(0b11<<5); // 8n1
+        registers.CR.write(0x301);     // enable Tx, Rx, FIFO
+
+        Self {
+            registers,
+        }
     }
 
     /// Send a character

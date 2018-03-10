@@ -35,12 +35,11 @@ KERNEL := $(BUILD_DIR)/$(RUST_BINARY)
 VPATH = ext
 
 all: $(KERNEL).img
+	cp -f $(KERNEL).img kernel8.img
 
 qemu: all
 	qemu-system-aarch64 -M raspi3 \
 		-m 1024 \
-		-smp 4 \
-		-accel tcg,thread=multi \
 		-display sdl,gl=on -sdl \
 		-drive file=fs.img,if=sd,format=raw \
 		-serial stdio \
@@ -76,7 +75,7 @@ $(BUILD_DIR)/%.o: %.S | $(BUILD_DIR)
 $(RUST_DEBUG_LIB): $(RUST_DEPS)
 	$(XARGO) build --target=$(TARGET)
 $(RUST_RELEASE_LIB): $(RUST_DEPS)
-	$(XARGO) build --release --target=$(TARGET)
+	$(XARGO) build --verbose --release --target=$(TARGET)
 
 ifeq ($(DEBUG),1)
 $(RUST_LIB): $(RUST_DEBUG_LIB) | $(BUILD_DIR)

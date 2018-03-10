@@ -22,7 +22,6 @@ SECTIONS
         *(.bss .bss.*)
         *(COMMON)
 
-        /* Stack must always be aligned to 8 byte boundary AAPCS64 call standard */
         . = ALIGN(16);
 
         _stack_core0_start = .;
@@ -59,8 +58,7 @@ SECTIONS
 
         . = ALIGN(4096);
         _ttbr_start = .;
-        /* 4096 * 6 */
-        . = . + 24576;
+        . = . + 4096 * 6;
 
         __bss_end = .;
     }

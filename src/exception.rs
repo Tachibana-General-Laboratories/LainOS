@@ -19,7 +19,7 @@ pub extern "C" fn exception_handler(kind: u64, esr: u64, elr: u64, spsr: u64, fa
 
     let mut state = unsafe { &mut *((sp) as *mut State) };
 
-    warn!("IT'S A TRAP!");
+    //warn!("IT'S A TRAP!");
 
     // print out interruption type
     match kind & 3 {
@@ -66,7 +66,7 @@ pub extern "C" fn exception_handler(kind: u64, esr: u64, elr: u64, spsr: u64, fa
     kprintln!("");
 
     // dump registers
-    debug!("reg el1:  ESR {:08X}  ELR {:016X} SPSR {:016X}  FAR {:016X}", esr, elr, spsr, far);
+    kprintln!("reg el1:  ESR {:08X}  ELR {:016X} SPSR {:016X}  FAR {:016X}", esr, elr, spsr, far);
 
     if kind != 8 {
         // no return from exception for now

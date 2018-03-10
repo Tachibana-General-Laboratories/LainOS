@@ -7,8 +7,8 @@ mod imp;
 #[cfg(test)]
 mod tests;
 
-//use mutex::Mutex;
-use spin::Mutex;
+use mutex::Mutex;
+//use spin::Mutex;
 use alloc::heap::{Alloc, AllocErr, Layout};
 use std::cmp::max;
 

@@ -64,11 +64,12 @@ start_el2:
     orr     x0, x0, #(0x1 << 12)    // The I bit on (instruction cache)
     msr     sctlr_el1, x2
 
+/*
     cpuid   x7
     cbnz    x7, 1f
     bl      init_mmu
-
 1:
+*/
 
     // enable FP/SIMD at EL1
     mov     x0, #3 << 20

@@ -24,8 +24,7 @@ volatile = { path = "volatile" }
 #std = { path = "std" }
 #pi = { path = "../pi", features = ["std"] }
 
-log = { version = "0.4", features = ["max_level_debug", "release_max_level_warn"] }
-#log = { version = "0.4", features = ["max_level_debug", "release_max_level_trace"] }
+log = { version = "0.4", features = ["max_level_trace", "release_max_level_warn"] }
 
 [lib]
 crate-type = ["staticlib"]

@@ -8,8 +8,10 @@ use std::io;
 
 use std::path::{Path, PathBuf};
 
+/*
 use super::FILE_SYSTEM;
 use fat32::traits::*;
+*/
 
 /// Error type for `Command` parse failures.
 #[derive(Debug)]
@@ -60,7 +62,7 @@ pub fn shell(prefix: &str) -> ! {
 
     kprint!("(/) {}", prefix);
 
-    let mut shell = Shell { cwd: PathBuf::from("/") };
+    let mut shell = Shell { /*cwd: PathBuf::from("/")*/ };
 
     let mut buf = [0u8; 512];
     let mut buf = StackVec::new(&mut buf);
@@ -80,8 +82,11 @@ pub fn shell(prefix: &str) -> ! {
                     }
                 }
                 buf.truncate(0);
+                /*
                 let cwd = shell.cwd.to_str().unwrap();
                 kprint!("({}) {}", cwd, prefix);
+                */
+                kprint!("{}", prefix);
             }
             127 | 8 => { // DEL | BS
                 if !buf.is_empty() {
@@ -104,7 +109,7 @@ pub fn shell(prefix: &str) -> ! {
 }
 
 struct Shell {
-    cwd: PathBuf,
+    //cwd: PathBuf,
 }
 
 impl Shell {
@@ -114,6 +119,7 @@ impl Shell {
                 self.echo(cmd.args);
                 kprint!("\r\n");
             }
+            /*
             "pwd" => {
                 kprint!("{}", self.cwd.to_str().unwrap());
                 kprint!("\r\n");
@@ -121,6 +127,7 @@ impl Shell {
             "cd" => self.cd(cmd.args),
             "ls" => self.ls(cmd.args),
             "cat" => self.cat(cmd.args),
+            */
 
             "poweroff" => {
                 kprintln!("power-off the machine");
@@ -138,6 +145,7 @@ impl Shell {
         }
     }
 
+    /*
     fn canonicalize<P: AsRef<Path>>(&self, p: P) -> io::Result<PathBuf> {
         use std::path::Component::*;
 
@@ -165,6 +173,7 @@ impl Shell {
 
         Ok(result)
     }
+    */
 
     fn echo(&self, args: StackVec<&str>) {
         for (i, arg) in args.iter().enumerate() {
@@ -176,6 +185,7 @@ impl Shell {
         }
     }
 
+    /*
     fn cd(&mut self, args: StackVec<&str>) {
         if args.len() == 1 {
             self.cwd = PathBuf::from("/");
@@ -220,4 +230,5 @@ impl Shell {
             Err(err) => kprintln!("cat: {}", err),
         }
     }
+    */
 }

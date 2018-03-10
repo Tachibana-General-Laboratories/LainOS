@@ -3,6 +3,7 @@
 #![feature(alloc, allocator_api, global_allocator)]
 #![feature(const_fn)]
 #![feature(decl_macro)]
+#![feature(optin_builtin_traits)]
 
 //#[macro_use]
 //extern crate bitflags;
@@ -10,15 +11,20 @@
 #[macro_use]
 extern crate alloc;
 extern crate slab_allocator;
-extern crate spin;
+//extern crate spin;
 extern crate stack_vec;
 extern crate volatile;
 
+/*
 #[macro_use]
 extern crate log;
+*/
 
+/*
 extern crate sys_fs as fat32;
+*/
 
+pub mod mutex;
 pub mod console;
 pub mod externs;
 pub mod panic;
@@ -26,7 +32,9 @@ pub mod util;
 pub mod exception;
 pub mod mmu;
 pub mod pi;
+/*
 pub mod fb;
+*/
 pub mod shell;
 
 //pub mod sd;
@@ -34,8 +42,10 @@ pub mod shell;
 //pub mod gles;
 
 
+/*
 pub mod fs;
 
+*/
 
 pub mod allocator;
 
@@ -64,17 +74,19 @@ const ADDR_512MB: usize = 0x2000_0000;
 const ADDR_1GB: usize   = 0x4000_0000;
 const ADDR_2GB: usize   = 0x8000_0000;
 
-pub static FILE_SYSTEM: fs::FileSystem = fs::FileSystem::uninitialized();
 
 #[cfg(not(test))]
 pub fn init_heap() {
-    let heap_start = KERNEL_SPACE | 0x0F00_0000;
-    let heap_end =   KERNEL_SPACE | 0x1000_0000;
+    let heap_start = 0x0F00_0000;
+    let heap_end =   0x1000_0000;
+    kprintln!("initialize heap {:X} - {:X}", heap_start, heap_end);
     unsafe {
         ALLOCATOR.init(heap_start, heap_end - heap_start);
     }
 }
 
+/*
+pub static FILE_SYSTEM: fs::FileSystem = fs::FileSystem::uninitialized();
 extern "C" {
     fn xsvc(a: u64, b: u64, c: u64, d: u64, ) -> u64;
 }
@@ -94,53 +106,58 @@ pub unsafe extern "C" fn el0_main() -> ! {
 
     shell::shell("> ")
 }
-
-fn blink() {
-    const GPIO_BASE: usize = 0x3F000000 + 0x200000;
-
-    const GPIO_FSEL1: *mut u32 = (GPIO_BASE + 0x04) as *mut u32;
-    const GPIO_SET0: *mut u32 = (GPIO_BASE + 0x1C) as *mut u32;
-    const GPIO_CLR0: *mut u32 = (GPIO_BASE + 0x28) as *mut u32;
-
-    #[inline(never)]
-    fn spin_sleep_ms(ms: usize) {
-        for _ in 0..(ms * 600) {
-            unsafe { asm!("nop" :::: "volatile"); }
-        }
-    }
-
-    unsafe {
-        GPIO_FSEL1.write_volatile(0b001 << 18);
-
-        loop {
-            GPIO_SET0.write_volatile(1 << 16);
-            spin_sleep_ms(1000);
-
-            GPIO_CLR0.write_volatile(1 << 16);
-            spin_sleep_ms(1000);
-        }
-    }
-
-}
+*/
 
 #[no_mangle]
 #[inline(never)]
 #[cfg(not(test))]
 pub extern "C" fn kernel_main(cpuid: u64) -> ! {
+    let mut pin = pi::gpio::Gpio::new(16).into_output();
 
-    blink();
+    pi::timer::spin_sleep_ms(1000);
+    pin.set();
 
-
-
+    pi::timer::spin_sleep_ms(1000);
+    pin.clear();
 
     kprintln!("start kernel main at CPU{}", cpuid);
+
+    /*
+    init_logger().unwrap();
+    info!("test logger");
+    */
+
+    kprintln!("initialize mmu");
+    unsafe { mmu::init_mmu(); }
+
+    init_heap();
+
+    shell::shell("> ");
+
+    for _ in 0..100 {
+        pi::timer::spin_sleep_ms(100);
+        pin.set();
+
+        kprintln!("fuck u");
+
+        pi::timer::spin_sleep_ms(100);
+        pin.clear();
+    }
+
+    panic!("dont panic!");
+
+    /*
+    kprintln!("start kernel main at CPU{}", cpuid);
+    /*
     if cpuid != 0 {
         loop {
             kprintln!("CPU{}", cpuid);
         }
     }
+    */
+    */
 
-    init_logger().unwrap();
+    test_timers();
 
     unsafe {
         //let f: u32 = (1 << 0) | (1 << 1) | (1 << 2);
@@ -149,19 +166,15 @@ pub extern "C" fn kernel_main(cpuid: u64) -> ! {
         let level: u32;
         // read the current level from system register
         asm!("mrs $0, CurrentEL" : "=r" (level) : : : "volatile");
-        debug!("Current EL is: 0x{:X} [0x{:X}]", (level >> 2) & 3, level);
+        kprintln!("Current EL is: 0x{:X} [0x{:X}]", (level >> 2) & 3, level);
     }
 
-    info!("init mmu");
-    unsafe { mmu::init_mmu(); }
-
+    /*
     info!("init heap");
     init_heap();
 
     info!("init fs");
     FILE_SYSTEM.initialize();
-
-    test_timers();
 
     //info!("init gles: {:?}", gles::InitV3D());
 
@@ -179,10 +192,12 @@ pub extern "C" fn kernel_main(cpuid: u64) -> ! {
 
     info!("init fb");
     init_fb();
+        */
 
     shell::shell("> ")
 }
 
+/*
 fn init_fb() {
     if let Some(mut fb) = fb::FrameBuffer::new(480, 320, 32) {
         fb.fill_rgba(0x000000);
@@ -197,25 +212,27 @@ fn init_fb() {
         warn!("Unable to set screen resolution");
     }
 }
+*/
 
 fn test_timers() {
-    debug!("Waiting 1000000 CPU cycles (ARM CPU): ");
+    kprintln!("Waiting 1000000 CPU cycles (ARM CPU): ");
     util::wait_cycles(1000000);
-    debug!("OK");
+    kprintln!("OK");
 
-    debug!("Waiting 1000000 microsec (ARM CPU): ");
+    kprintln!("Waiting 1000000 microsec (ARM CPU): ");
     util::wait_msec(1000000);
-    debug!("OK");
+    kprintln!("OK");
 
-    debug!("Waiting 1000000 microsec (BCM System Timer): ");
+    kprintln!("Waiting 1000000 microsec (BCM System Timer): ");
     if pi::timer::current_time() == 0 {
-        debug!("Not available");
+        kprintln!("Not available");
     } else {
         pi::timer::spin_sleep_us(1000000);
-        debug!("OK");
+        kprintln!("OK");
     }
 }
 
+/*
 
 use log::{Record, Level, Metadata};
 use log::{SetLoggerError, LevelFilter};
@@ -249,3 +266,4 @@ pub fn init_logger() -> Result<(), SetLoggerError> {
     log::set_max_level(log::LevelFilter::Trace);
     log::set_logger(&LOGGER)
 }
+*/
