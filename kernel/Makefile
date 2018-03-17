@@ -1,6 +1,6 @@
-arch := aarch64-elf
-TARGET ?= raspi3-lainos
-CROSS := $(arch)
+arch := aarch64
+TARGET ?= raspi3
+CROSS ?= $(arch)-elf
 
 CC := $(CROSS)-gcc
 CCFLAGS ?= -Wall -O2 -ffreestanding -nostdinc -nostdlib -nostartfiles -pie -fpie
@@ -38,7 +38,7 @@ all: $(KERNEL).img
 	cp -f $(KERNEL).img ../kernel8.img
 
 qemu: all
-	qemu-system-aarch64 -M raspi3 \
+	qemu-system-$(arch) -M raspi3 \
 		-m 1024 \
 		-display sdl,gl=on -sdl \
 		-drive file=fs.img,if=sd,format=raw \
@@ -46,7 +46,7 @@ qemu: all
 		-kernel $(KERNEL).img
 
 qemu2: all
-	sudo qemu-system-aarch64 -M raspi3 \
+	sudo qemu-system-$(arch) -M raspi3 \
 		-m 1024 \
 		-smp 4 \
 		-accel tcg,thread=multi \

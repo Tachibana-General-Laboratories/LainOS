@@ -8,7 +8,7 @@ use std::io;
 
 use std::path::{Path, PathBuf};
 
-use super::FILE_SYSTEM;
+use FILE_SYSTEM;
 use fat32::traits::*;
 
 /// Error type for `Command` parse failures.
