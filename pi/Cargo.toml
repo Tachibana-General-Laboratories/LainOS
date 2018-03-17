@@ -1,0 +1,10 @@
+[package]
+name = "pi"
+version = "0.1.0"
+authors = ["Sergio Benitez <sb@sergio.bz>"]
+
+[dependencies]
+volatile = { path = "../volatile" }
+
+[features]
+std = []
