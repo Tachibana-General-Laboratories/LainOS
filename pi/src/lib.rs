@@ -19,3 +19,4 @@ pub mod gpio;
 pub mod common;
 pub mod atags;
 pub mod interrupt;
+pub mod mbox;

@@ -30,10 +30,9 @@ pub struct Controller {
 
 impl Controller {
     /// Returns a new handle to the interrupt controller.
-    pub fn new() -> Controller {
-        Controller {
-            registers: unsafe { &mut *(INT_BASE as *mut Registers) },
-        }
+    pub fn new() -> Self {
+        let registers = unsafe { &mut *(INT_BASE as *mut Registers) };
+        Self { registers }
     }
 
     /// Enables the interrupt `int`.

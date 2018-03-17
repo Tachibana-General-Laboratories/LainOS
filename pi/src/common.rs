@@ -9,3 +9,21 @@ pub macro states($($name:ident),*) {
         pub enum $name {  }
     )*
 }
+
+#[inline(always)]
+pub fn spin_sleep_cycles(cycles: u32) {
+    for _ in 0..cycles {
+        unsafe { asm!("nop" :::: "volatile") }
+    }
+}
+
+
+#[inline(always)]
+pub fn spin_wait<F>(mut f: F)
+    where F: FnMut() -> bool
+{
+    while {
+        unsafe { asm!("nop" :::: "volatile"); }
+        f()
+    } {}
+}

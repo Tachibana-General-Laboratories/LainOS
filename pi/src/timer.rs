@@ -21,16 +21,17 @@ pub struct Timer {
 
 impl Timer {
     /// Returns a new instance of `Timer`.
-    pub fn new() -> Timer {
-        Timer {
-            registers: unsafe { &mut *(TIMER_REG_BASE as *mut Registers) },
-        }
+    pub fn new() -> Self {
+        let registers = unsafe { &mut *(TIMER_REG_BASE as *mut Registers) };
+        Self { registers }
     }
 
     /// Reads the system timer's counter and returns the 64-bit counter value.
     /// The returned value is the number of elapsed microseconds.
     pub fn read(&self) -> u64 {
-        unimplemented!()
+        let lo = self.registers.CLO.read() as u64;
+        let hi = self.registers.CHI.read() as u64;
+        lo | (hi << 32)
     }
 
     /// Sets up a match in timer 1 to occur `us` microseconds from now. If
@@ -43,17 +44,22 @@ impl Timer {
 
 /// Returns the current time in microseconds.
 pub fn current_time() -> u64 {
-    unimplemented!()
+    Timer::new().read()
 }
 
 /// Spins until `us` microseconds have passed.
 pub fn spin_sleep_us(us: u64) {
-    unimplemented!()
+    // we must check if it's non-zero, because qemu does not emulate
+    // system timer, and returning constant zero would mean infinite loop
+    let t = current_time();
+    if t != 0 {
+        while { current_time() < t + us } {}
+    }
 }
 
 /// Spins until `ms` milliseconds have passed.
 pub fn spin_sleep_ms(ms: u64) {
-    unimplemented!()
+    spin_sleep_us(ms * 1000)
 }
 
 /// Sets up a match in timer 1 to occur `us` microseconds from now. If
