@@ -327,7 +327,7 @@ impl<T: io::Read + io::Write> Xmodem<T> {
             self.expect_byte(NAK, "wait NAK")?;
             self.write_byte(EOT)?;
             self.expect_byte(ACK, "wait ACK")?;
-            Ok((0))
+            Ok(0)
         } else if buf.len() < 128 {
             Err(io::Error::new(io::ErrorKind::UnexpectedEof, "buf.len() < 128"))
         } else {
