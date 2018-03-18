@@ -65,6 +65,8 @@ impl FrameBuffer {
     pub fn height(&self) -> u32 { self.height }
     pub fn pitch(&self) -> u32 { self.pitch }
 
+    pub fn addr(&self) -> usize { self.buffer as usize }
+
     pub unsafe fn set(&mut self, offset: isize, color: u32) {
         (self.buffer.offset(offset) as *mut u32).write_volatile(color);
     }

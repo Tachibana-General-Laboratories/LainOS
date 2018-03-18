@@ -1,5 +1,7 @@
-use pi::IO_BASE;
+use pi::common::IO_BASE;
 use pi::mbox::{self, gpu2arm};
+
+use console::kprintln;
 
 use volatile::prelude::*;
 use volatile::Volatile;
@@ -16,8 +18,21 @@ use volatile::Volatile;
 #include "rpi-GLES.h"
 */
 
+const V3D_START: usize = (IO_BASE + 0xc00000);
 
-const v3d: *mut Volatile<u32> = (IO_BASE + 0xc00000) as *mut Volatile<u32>;
+const v3d: *mut Volatile<u32> = V3D_START as *mut Volatile<u32>;
+
+fn v3d_write(reg: usize, value: u32) {
+    unsafe {
+        (*v3d.add(reg)).write(value);
+    }
+}
+
+fn v3d_read(reg: usize) -> u32 {
+    unsafe {
+        (*v3d.add(reg)).read()
+    }
+}
 
 struct PerformanceCounter {
     Count: Volatile<u32>,
@@ -222,7 +237,7 @@ pub fn InitV3D() -> Result<(), ()> {
         mbox::Tag::ENABLE_QPU as u32, 4, 4, 1,
     ]).is_some();
     unsafe {
-        if tag && v3d.offset(V3D_IDENT0 as isize).read().read() == 0x02443356 {
+        if tag && (*v3d.add(V3D_IDENT0)).read() == 0x02443356 {
             Ok(())
         } else {
             Err(())
@@ -422,13 +437,23 @@ impl<'a> Buffer<'a> {
     api!(NV_SHADER_STATE => nv_shader_state(addr: u32));
     api!(GL_INDEXED_PRIMITIVE => gl_indexed_primitive(prim: u8, idx: u32, len: u32, max: u32));
 
+
+    api!(CLEAR_COLORS => clear_colors(a: u32, b: u32, c: u32, d: u32));
+    api!(TILE_RENDERING_MODE_CONFIG => tile_rendering_mode_config(addr: u32, w: u16, h: u16, m: u8, x: u8));
+    api!(TILE_COORDINATES => tile_coordinates(x: u8, y: u8));
+    api!(STORE_TILE_BUFFER_GENERAL => store_tile_buffer_general(wtf: u16, addr: u32));
+
+    api!(STORE_MS_TILE_BUFFER_AND_EOF => store_ms_tile_buffer_and_eof());
+    api!(STORE_MS_TILE_BUFFER => store_ms_tile_buffer());
+    api!(BRANCH_TO_SUB_LIST => branch_to_sub_list(addr: u32));
+
     api!(FLUSH_ALL => flush_all());
     api!(NOP => nop());
     api!(HALT => halt());
 }
 
 // Render a single triangle to memory.
-fn test_triangle(render_w: u16, render_h: u16, render_buffer_addr: u32/*, prn_handler: printhandler*/) {
+pub fn test_triangle(render_w: u16, render_h: u16, render_buffer_addr: u32/*, prn_handler: printhandler*/) {
     // We allocate/lock some videocore memory
     // I'm just shoving everything in a single buffer because I'm lazy 8Mb, 4k alignment
     // Normally you would do individual allocations but not sure of interface I want yet
@@ -443,24 +468,30 @@ fn test_triangle(render_w: u16, render_h: u16, render_buffer_addr: u32/*, prn_ha
     const BUFFER_FRAGMENT_SHADER: usize = 0xfe00;
     const BUFFER_FRAGMENT_UNIFORM: usize = 0xff00;
 
+    kprintln!("start");
+
     let mut handle = Memory::alloc(0x80_0000, 0x1000, MemFlags::COHERENT | MemFlags::ZERO)
         .expect("Unable to allocate memory");
     let mut bus = Lock::lock(&mut handle).expect("lock");
     let bus_addr = bus.handle as usize;
 
+
+    // Configuration stuff
+    // Tile Binning Configuration.
+    //   Tile state data is 48 bytes per tile, I think it can be thrown away
+    //   as soon as binning is finished.
+    //   A tile itself is 64 x 64 pixels
+    //   we will need binWth of them across to cover the render width
+    //   we will need binHt of them down to cover the render height
+    //   we add 63 before the division because any fraction at end must have a bin
+    let bin_w = (render_w as u32 + 63) / 64;  // Tiles across
+    let bin_h = (render_h as u32 + 63) / 64;  // Tiles down
+
+
+    kprintln!("cmd");
+
     let cmd_length = {
         let mut p = Buffer::start(bus.slice());
-
-        // Configuration stuff
-        // Tile Binning Configuration.
-        //   Tile state data is 48 bytes per tile, I think it can be thrown away
-        //   as soon as binning is finished.
-        //   A tile itself is 64 x 64 pixels
-        //   we will need binWth of them across to cover the render width
-        //   we will need binHt of them down to cover the render height
-        //   we add 63 before the division because any fraction at end must have a bin
-        let bin_w = (render_w as u32 + 63) / 64;  // Tiles across
-        let bin_h = (render_h as u32 + 63) / 64;    // Tiles down
 
         p.tile_binning_mode_config(
             (bus_addr + BUFFER_TILE_DATA) as u32,  // tile allocation memory address
@@ -498,6 +529,8 @@ fn test_triangle(render_w: u16, render_h: u16, render_buffer_addr: u32/*, prn_ha
 
         p.end()
     };
+
+    kprintln!("after cmd");
 
 
     // Okay now we need Shader Record to buffer
@@ -610,93 +643,80 @@ fn test_triangle(render_w: u16, render_h: u16, render_buffer_addr: u32/*, prn_ha
         p.u32(0x500009e7); // nop; nop; sbdone
     }
 
-        /*
     // Render control list
-    p = list + BUFFER_RENDER_CONTROL;
+    let render_length = {
+        let mut p = Buffer::start(&mut bus.slice()[BUFFER_RENDER_CONTROL..]);
 
-    // Clear colors
-    emit_uint8_t(&p, GL_CLEAR_COLORS);
-    emit_uint32_t(&p, 0xff000000);            // Opaque Black
-    emit_uint32_t(&p, 0xff000000);            // 32 bit clear colours need to be repeated twice
-    emit_uint32_t(&p, 0);
-    emit_uint8_t(&p, 0);
+        // Opaque Black
+        // 32 bit clear colours need to be repeated twice
+        p.clear_colors(0xff000000, 0xff000000, 0, 0);
 
-    // Tile Rendering Mode Configuration
-    emit_uint8_t(&p, GL_TILE_RENDER_CONFIG);
+        // Tile Rendering Mode Configuration
+        // framebuffer mode (linear rgba8888)
+        p.tile_rendering_mode_config(render_buffer_addr, render_w, render_h, 0x04, 0x00);
 
-    emit_uint32_t(&p, renderBufferAddr);    // render address
+        // Do a store of the first tile to force the tile buffer to be cleared
+        // Tile Coordinates
+        p.tile_coordinates(0, 0);
+        // Store Tile Buffer General
+        // Store nothing (just clear)
+        // no address is needed
+        p.store_tile_buffer_general(0, 0);
 
-    emit_uint16_t(&p, renderWth);            // width
-    emit_uint16_t(&p, renderHt);            // height
-    emit_uint8_t(&p, 0x04);                    // framebuffer mode (linear rgba8888)
-    emit_uint8_t(&p, 0x00);
+        // Link all binned lists together
+        for x in 0..bin_w {
+            for y in 0..bin_h {
+                p.tile_coordinates(x as u8, y as u8);
+                // Call Tile sublist
+                let addr = bus_addr + BUFFER_TILE_DATA + ((y * bin_w + x) * 32) as usize;
+                p.branch_to_sub_list(addr as u32);
 
-    // Do a store of the first tile to force the tile buffer to be cleared
-    // Tile Coordinates
-    emit_uint8_t(&p, GL_TILE_COORDINATES);
-    emit_uint8_t(&p, 0);
-    emit_uint8_t(&p, 0);
-    // Store Tile Buffer General
-    emit_uint8_t(&p, GL_STORE_TILE_BUFFER);
-    emit_uint16_t(&p, 0);                    // Store nothing (just clear)
-    emit_uint32_t(&p, 0);                    // no address is needed
-
-    // Link all binned lists together
-    for (int x = 0; x < binWth; x++) {
-        for (int y = 0; y < binHt; y++) {
-
-            // Tile Coordinates
-            emit_uint8_t(&p, GL_TILE_COORDINATES);
-            emit_uint8_t(&p, x);
-            emit_uint8_t(&p, y);
-
-            // Call Tile sublist
-            emit_uint8_t(&p, GL_BRANCH_TO_SUBLIST);
-            emit_uint32_t(&p, bus_addr + BUFFER_TILE_DATA + (y * binWth + x) * 32);
-
-            // Last tile needs a special store instruction
-            if (x == (binWth - 1) && (y == binHt - 1)) {
-                // Store resolved tile color buffer and signal end of frame
-                emit_uint8_t(&p, GL_STORE_MULTISAMPLE_END);
-            } else {
-                // Store resolved tile color buffer
-                emit_uint8_t(&p, GL_STORE_MULTISAMPLE);
+                // Last tile needs a special store instruction
+                if x == (bin_w - 1) && y == (bin_h - 1) {
+                    // Store resolved tile color buffer and signal end of frame
+                    p.store_ms_tile_buffer_and_eof();
+                } else {
+                    // Store resolved tile color buffer
+                    p.store_ms_tile_buffer();
+                }
             }
         }
-    }
+        p.end()
+    };
 
 
-    int render_length = p - (list + BUFFER_RENDER_CONTROL);
+    kprintln!("run");
 
 
     // Run our control list
-    v3d[V3D_BFC] = 1;                         // reset binning frame count
-    v3d[V3D_CT0CA] = bus_addr;
-    v3d[V3D_CT0EA] = bus_addr + length;
+    v3d_write(V3D_BFC, 1);                         // reset binning frame count
+    v3d_write(V3D_CT0CA, bus_addr as u32);
+    v3d_write(V3D_CT0EA, (bus_addr + cmd_length) as u32);
 
     // Wait for control list to execute
-    while (v3d[V3D_CT0CS] & 0x20);
+    while { v3d_read(V3D_CT0CS) & 0x20 != 0 } {}
 
     // wait for binning to finish
-    while (v3d[V3D_BFC] == 0) {}
+    while { v3d_read(V3D_BFC) == 0 } {}
 
     // stop the thread
-    v3d[V3D_CT0CS] = 0x20;
+    v3d_write(V3D_CT0CS, 0x20);
 
     // Run our render
-    v3d[V3D_RFC] = 1;                        // reset rendering frame count
-    v3d[V3D_CT1CA] = bus_addr + BUFFER_RENDER_CONTROL;
-    v3d[V3D_CT1EA] = bus_addr + BUFFER_RENDER_CONTROL + render_length;
+    v3d_write(V3D_RFC, 1);                        // reset rendering frame count
+    v3d_write(V3D_CT1CA, (bus_addr + BUFFER_RENDER_CONTROL) as u32);
+    v3d_write(V3D_CT1EA, (bus_addr + BUFFER_RENDER_CONTROL + render_length) as u32);
 
     // Wait for render to execute
-    while (v3d[V3D_CT1CS] & 0x20);
+    while { v3d_read(V3D_CT1CS) & 0x20 != 0 } {}
 
     // wait for render to finish
-    while(v3d[V3D_RFC] == 0) {}
+    while { v3d_read(V3D_RFC) == 0 } {}
 
     // stop the thread
-    v3d[V3D_CT1CS] = 0x20;
+    v3d_write(V3D_CT1CS, 0x20);
 
+/*
     // Release resources
     V3D_mem_unlock(handle);
     V3D_mem_free(handle);

@@ -1,5 +1,10 @@
 #include "macro.S"
 
+#define EL0 0b00
+#define EL1 0b01
+#define EL2 0b10
+#define EL3 0b11
+
 .section ".text.boot"
 
 .global _start
@@ -10,12 +15,15 @@ _start:
     msr     cnthctl_el2, x0
     msr     cntvoff_el2, xzr
 
-    cpuid   x7
-    cbz     x7, 2f
     // cpu id > 0, stop
-1:  wfe
-    b       1b
-2:  // cpu id == 0
+    cpuid   x7
+    cbz     x7, setup
+
+halt:
+    wfe
+    b       halt
+
+setup:
 
 multicore_start:
     // set up EL1
@@ -143,10 +151,7 @@ bss_clear_loop:
 rust_main:
     cpuid   x0
     bl      kernel_main
-
     // for failsafe, halt this core
-halt:
-    wfe
     b       halt
 
 
@@ -170,131 +175,123 @@ halt:
 //  X30 link register
 //  SP stack pointer (XZR)
 
-.macro      start_handler el=el1
-    str     x30,      [sp, #-16]!
-    stp     x28, x29, [sp, #-16]!
-    stp     x26, x27, [sp, #-16]!
-    stp     x24, x25, [sp, #-16]!
-    stp     x22, x23, [sp, #-16]!
-    stp     x20, x21, [sp, #-16]!
-    stp     x18, x19, [sp, #-16]!
-    stp     x16, x17, [sp, #-16]!
-    stp     x14, x15, [sp, #-16]!
-    stp     x12, x13, [sp, #-16]!
-    stp     x10, x11, [sp, #-16]!
-    stp     x8 , x9 , [sp, #-16]!
-    stp     x6 , x7 , [sp, #-16]!
-    stp     x4 , x5 , [sp, #-16]!
-    stp     x2 , x3 , [sp, #-16]!
-    stp     x0 , x1 , [sp, #-16]!
-    mrs     x1, spsr_\el
-    mrs     x2, elr_\el
-    stp     x1 , x2 , [sp, #-16]!
-.endm
-
-.macro      end_handler el=el1
-    ldp     x1 , x2 , [sp], #16
-    msr     elr_\el, x2
-    msr     spsr_\el, x1
-    ldp     x0 , x1 , [sp], #16
-    ldp     x2 , x3 , [sp], #16
-    ldp     x4 , x5 , [sp], #16
-    ldp     x6 , x7 , [sp], #16
-    ldp     x8 , x9 , [sp], #16
-    ldp     x10, x11, [sp], #16
-    ldp     x12, x13, [sp], #16
-    ldp     x14, x15, [sp], #16
-    ldp     x16, x17, [sp], #16
-    ldp     x18, x19, [sp], #16
-    ldp     x20, x21, [sp], #16
-    ldp     x22, x23, [sp], #16
-    ldp     x24, x25, [sp], #16
-    ldp     x26, x27, [sp], #16
-    ldp     x28, x29, [sp], #16
-    ldr     x30,      [sp], #16
-.endm
-
-.macro      except num
-    start_handler
-    enable_interrupts
-
-    mov     x0, \num
-    mrs     x1, esr_el1
-    mrs     x2, elr_el1
-    mrs     x3, spsr_el1
-    mrs     x4, far_el1
-    mov     x5, sp
-    bl      exception_handler
-
-    disable_interrupts
-    end_handler
+.macro HANDLER source, kind
+.align 7
+    stp     x30, x0, [SP, #-16]!
+    mov     x0, \source
+    movk    x0, \kind, LSL #16
+    bl      context_save
+    bl      context_restore
+    ldp     x30, x0, [SP], #16
     eret
 .endm
+
+context_save:
+    sub     SP, SP, #272
+
+    stp     xzr, x29, [SP, #32 ]
+    stp     x28, x27, [SP, #48 ]
+    stp     x26, x25, [SP, #64 ]
+    stp     x24, x23, [SP, #80 ]
+    stp     x22, x21, [SP, #96 ]
+    stp     x20, x19, [SP, #112]
+    stp     x18, x17, [SP, #128]
+    stp     x16, x15, [SP, #144]
+    stp     x14, x13, [SP, #160]
+    stp     x12, x11, [SP, #176]
+    stp     x10, x9 , [SP, #192]
+    stp     x8 , x7 , [SP, #208]
+    stp     x6 , x5 , [SP, #224]
+    stp     x4 , x3 , [SP, #240]
+    stp     x2 , x1 , [SP, #256]
+
+    // TODO: q31..q0
+
+    mrs     x1, TPIDR_EL0
+    mrs     x2, SP_EL0
+    mrs     x3, SPSR_EL1
+    mrs     x4, ELR_EL1
+
+    stp     x1, x2, [SP, #0]
+    stp     x3, x4, [SP, #16]
+
+    mrs     x1, ESR_EL1
+    mov     x2, SP
+
+    enable_interrupts
+    stp     x30, x0, [SP, #-16]!
+    bl      handle_exception
+    ldp     x30, x0, [SP], #16
+    disable_interrupts
+
+    ret
+
+.global context_restore
+context_restore:
+    ldp     x1, x2, [SP, #0]
+    ldp     x3, x4, [SP, #16]
+
+    msr     TPIDR_EL0, x1
+    msr     SP_EL0, x2
+    msr     SPSR_EL1, x3
+    msr     ELR_EL1, x4
+
+    stp     xzr, x29, [SP, #32 ]
+    stp     x28, x27, [SP, #48 ]
+    stp     x26, x25, [SP, #64 ]
+    stp     x24, x23, [SP, #80 ]
+    stp     x22, x21, [SP, #96 ]
+    stp     x20, x19, [SP, #112]
+    stp     x18, x17, [SP, #128]
+    stp     x16, x15, [SP, #144]
+    stp     x14, x13, [SP, #160]
+    stp     x12, x11, [SP, #176]
+    stp     x10, x9 , [SP, #192]
+    stp     x8 , x7 , [SP, #208]
+    stp     x6 , x5 , [SP, #224]
+    stp     x4 , x3 , [SP, #240]
+    stp     x2 , x1 , [SP, #256]
+
+    // TODO: q31..q0
+
+    add     SP, SP, #272
+
+    ret
 
 
 .global xsvc
 xsvc:
     #mov x8, #666
-    svc #0
+    svc #666
     ret
-
-_xh0: except #0x0
-_xh1: except #0x1
-_xh2: except #0x2
-_xh3: except #0x3
-
-_xh4: except #0x4
-_xh5: except #0x5
-_xh6: except #0x6
-_xh7: except #0x7
-
-_xh8: except #0x8
-_xh9: except #0x9
-_xhA: except #0xA
-_xhB: except #0xB
-
-_xhC: except #0xC
-_xhD: except #0xD
-_xhE: except #0xE
-_xhF: except #0xF
-
-
-_ert:
-    eret
-.balign 4
-.ltorg // Tell assembler ltorg data for code above can go here
-
 
 
 // macro to align handlers every 0x80 bytes
-.macro      vector handler
-.balign 0x80
-    b       \handler
-.endm
+//.balign 0x80
 
 .globl      _vector_table
 .balign 0x800
 _vector_table:
-    // from current EL with sp_el0
-    vector  _xh0    // synchronous
-    vector  _xh1    // IRQ
-    vector  _xh2    // FIQ
-    vector  _xh3    // SError
+    // Target and source at same exception level with source SP = SP_EL0
+    HANDLER #0x0, #0x0  // Synchronous exception
+    HANDLER #0x0, #0x1  // IRQ
+    HANDLER #0x0, #0x2  // FIQ
+    HANDLER #0x0, #0x3  // SError
 
-    // from current EL with sp_elx, x != 0
-    vector  _xh4    // Synchronous
-    vector  _xh5    // IRQ
-    vector  _xh6    // FIQ
-    vector  _xh7    // SError
+    // Target and source at same exception level with source SP = SP_ELx
+    HANDLER #0x1, #0x0  // Synchronous exception
+    HANDLER #0x1, #0x1  // IRQ
+    HANDLER #0x1, #0x2  // FIQ
+    HANDLER #0x1, #0x3  // SError
 
-    // from lower EL, target EL minus 1 is AArch64
-    vector  _xh8    // Synchronous
-    vector  _xh9    // IRQ
-    vector  _xhA    // FIQ
-    vector  _xhB    // SError
+    // Source is at lower exception level running on AArch64
+    HANDLER #0x2, #0x0  // Synchronous exception
+    HANDLER #0x2, #0x1  // IRQ
+    HANDLER #0x2, #0x2  // FIQ
+    HANDLER #0x2, #0x3  // SError
 
-    // from lower EL, target EL minus 1 is AArch32
-    vector  _xhC    // Synchronous
-    vector  _xhD    // IRQ
-    vector  _xhE    // FIQ
-    vector  _xhF    // SError
+    // Source is at lower exception level running on AArch32
+    HANDLER #0x3, #0x0  // Synchronous exception
+    HANDLER #0x3, #0x1  // IRQ
+    HANDLER #0x3, #0x2  // FIQ
+    HANDLER #0x3, #0x3  // SError

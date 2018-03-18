@@ -1,12 +1,23 @@
-#![feature(compiler_builtins_lib, lang_items, asm, pointer_methods)]
+#![feature(lang_items)]
 #![feature(core_intrinsics)]
-#![feature(alloc, allocator_api, global_allocator)]
 #![feature(const_fn)]
-#![feature(decl_macro)]
+#![feature(asm)]
 #![feature(optin_builtin_traits)]
+#![feature(decl_macro)]
+#![feature(repr_align)]
+#![feature(attr_literals)]
+#![feature(exclusive_range_pattern)]
+#![feature(i128_type)]
+#![feature(never_type)]
+#![feature(unique)]
+#![feature(pointer_methods)]
+#![feature(naked_functions)]
+#![feature(fn_must_use)]
+#![feature(alloc, allocator_api, global_allocator)]
+#![feature(ptr_internals)]
 
-//#[macro_use]
-//extern crate bitflags;
+#[macro_use]
+extern crate bitflags;
 
 #[macro_use]
 extern crate alloc;
@@ -18,26 +29,30 @@ extern crate volatile;
 extern crate pi;
 extern crate sys_fs as fat32;
 
+
 /*
 #[macro_use]
 extern crate log;
 */
 
 
+pub mod aarch64;
+pub mod process;
+pub mod traps;
+pub mod vm;
+
+
 pub mod mutex;
 pub mod console;
-pub mod externs;
 pub mod panic;
 pub mod util;
-pub mod exception;
 pub mod mmu;
-//pub mod pi;
 pub mod fb;
 pub mod shell;
 
 //pub mod sd;
 //pub mod sdn;
-//pub mod gles;
+pub mod gles;
 
 
 pub mod fs;
@@ -73,7 +88,6 @@ extern "C" {
     fn xsvc(a: u64, b: u64, c: u64, d: u64, ) -> u64;
 }
 
-/*
 #[no_mangle]
 #[inline(never)]
 #[cfg(not(test))]
@@ -84,12 +98,8 @@ pub unsafe extern "C" fn el0_main() -> ! {
         kprintln!("im a bear suite");
     }
 
-    info!("init fb");
-    init_fb();
-
     shell::shell("> ")
 }
-*/
 
 #[no_mangle]
 #[inline(never)]
@@ -102,7 +112,8 @@ pub extern "C" fn kernel_main(cpuid: u64) -> ! {
     pi::timer::spin_sleep_ms(1000);
     pin.clear();
 
-    kprintln!("start kernel main at CPU{}", cpuid);
+    let el = unsafe { aarch64::current_el() };
+    kprintln!("start kernel main at CPU{} [EL{}]", cpuid, el);
 
     /*
     init_logger().unwrap();
@@ -118,11 +129,25 @@ pub extern "C" fn kernel_main(cpuid: u64) -> ! {
 
     unsafe {
         ALLOCATOR.initialize();
+        FILE_SYSTEM.initialize();
     }
 
     test_timers();
 
-    init_fb();
+    //init_fb(480, 320);
+    init_fb(1920, 1080);
+
+    if true {
+        unsafe {
+            asm!("
+            mov x1, $0;
+            msr elr_el1, x1;
+            mov x1, #0x3c0;
+            msr spsr_el1, x1;
+            eret;
+            " : : "r" (el0_main as *const ()) : : "volatile");
+        }
+    }
 
     shell::shell("> ");
 
@@ -150,16 +175,6 @@ pub extern "C" fn kernel_main(cpuid: u64) -> ! {
     */
 
 
-    unsafe {
-        //let f: u32 = (1 << 0) | (1 << 1) | (1 << 2);
-        //asm!("msr cntv_ctl_el0, $0" : : "r"(f) : : "volatile");
-
-        let level: u32;
-        // read the current level from system register
-        asm!("mrs $0, CurrentEL" : "=r" (level) : : : "volatile");
-        kprintln!("Current EL is: 0x{:X} [0x{:X}]", (level >> 2) & 3, level);
-    }
-
     /*
     info!("init heap");
     init_heap();
@@ -167,31 +182,15 @@ pub extern "C" fn kernel_main(cpuid: u64) -> ! {
     info!("init fs");
     FILE_SYSTEM.initialize();
 
-    //info!("init gles: {:?}", gles::InitV3D());
-
-    if true {
-        unsafe {
-            asm!("
-            mov x1, $0;
-            msr elr_el1, x1;
-            mov x1, #0x3c0;
-            msr spsr_el1, x1;
-            eret;
-            " : : "r" (el0_main as *const ()) : : "volatile");
-        }
-    }
         */
 
     shell::shell("> ")
 }
 
-fn init_fb() {
-    kprintln!("initialize fb");
-    //if let Some(mut fb) = fb::FrameBuffer::new(1920, 1080, 32) {
-    if let Some(mut fb) = fb::FrameBuffer::new(480, 320, 32) {
-        kprintln!("OK: {:?}", fb);
+fn init_fb(w: u32, h: u32) {
+    kprintln!("initialize fb {}x{}", w, h);
+    if let Some(mut fb) = fb::FrameBuffer::new(w, h, 32) {
         fb.fill_rgba(0x330000);
-        kprintln!("filled");
 
         fb::font().uprint(&mut fb, 13, 5, "Prepare uranus!", 0x00FF00, 0x0000FF);
         fb::font().uprint(&mut fb, 13, 6, "Prepare uranus!", 0xFF0000, 0x0000FF);
@@ -200,21 +199,32 @@ fn init_fb() {
         fb::font().uprint(&mut fb, 1, 0, "  .  ",  0xFFFFFF, 0x000000);
         fb::font().uprint(&mut fb, 1, 1, "< 0 >",  0xFFFFFF, 0x000000);
         fb::font().uprint(&mut fb, 1, 2, "./ \\.", 0xFFFFFF, 0x000000);
+
+        /*
+        kprint!("init gles:");
+        if let Ok(_) = gles::InitV3D() {
+            kprintln!("OK");
+            gles::test_triangle(1920, 1080, pi::mbox::arm2gpu(fb.addr()) as u32);
+        } else {
+            kprintln!("ERR");
+        }
+        */
+
     } else {
         kprintln!("Unable to set screen resolution");
     }
 }
 
 fn test_timers() {
-    kprintln!("Waiting 1000000 CPU cycles (ARM CPU): ");
+    kprint!("Waiting 1000000 CPU cycles (ARM CPU): ");
     util::wait_cycles(1000000);
     kprintln!("OK");
 
-    kprintln!("Waiting 1000000 microsec (ARM CPU): ");
+    kprint!("Waiting 1000000 microsec (ARM CPU): ");
     util::wait_msec(1000000);
     kprintln!("OK");
 
-    kprintln!("Waiting 1000000 microsec (BCM System Timer): ");
+    kprint!("Waiting 1000000 microsec (BCM System Timer): ");
     if pi::timer::current_time() == 0 {
         kprintln!("Not available");
     } else {
