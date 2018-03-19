@@ -19,9 +19,10 @@
 #[macro_use]
 extern crate bitflags;
 
+extern crate core;
 #[macro_use]
 extern crate alloc;
-//extern crate slab_allocator;
+extern crate slab_allocator;
 //extern crate spin;
 
 extern crate stack_vec;
@@ -36,35 +37,40 @@ extern crate log;
 */
 
 
-pub mod aarch64;
-pub mod process;
-pub mod traps;
-pub mod vm;
+#[cfg(not(test))] pub mod aarch64;
+#[cfg(not(test))] pub mod process;
+#[cfg(not(test))] pub mod traps;
+#[cfg(not(test))] pub mod vm;
 
 
 pub mod mutex;
 pub mod console;
-pub mod panic;
-pub mod util;
-pub mod mmu;
-pub mod fb;
-pub mod shell;
+
+#[cfg(not(test))] pub mod panic;
+#[cfg(not(test))] pub mod mmu;
+
+#[cfg(not(test))] pub mod fb;
+#[cfg(not(test))] pub mod shell;
 
 //pub mod sd;
 //pub mod sdn;
 pub mod gles;
 
 
+#[cfg(not(test))]
 pub mod fs;
 pub mod allocator;
 
-//use slab_allocator::LockedHeap;
 use alloc::*;
 
 use console::{kprint, kprintln};
 
 #[global_allocator]
-static mut ALLOCATOR: allocator::Allocator = allocator::Allocator::uninitialized();
+#[cfg(not(test))]
+pub static mut ALLOCATOR: allocator::Allocator = allocator::Allocator::uninitialized();
+
+#[cfg(not(test))]
+pub static FILE_SYSTEM: fs::FileSystem = fs::FileSystem::uninitialized();
 
 const BINARY_START_ADDR: usize = 0x8_0000; // 512kb
 const KERNEL_SPACE: usize = 0xFFFFFF80_00000000;
@@ -83,37 +89,37 @@ const ADDR_1GB: usize   = 0x4000_0000;
 const ADDR_2GB: usize   = 0x8000_0000;
 
 
-pub static FILE_SYSTEM: fs::FileSystem = fs::FileSystem::uninitialized();
 extern "C" {
     fn xsvc(a: u64, b: u64, c: u64, d: u64, ) -> u64;
 }
 
 #[no_mangle]
-#[inline(never)]
 #[cfg(not(test))]
 pub unsafe extern "C" fn el0_main() -> ! {
     for _ in 0..4 {
         let v = xsvc(111, 222, 333, 444);
         kprintln!("fuck you shit: {}", v);
-        kprintln!("im a bear suite");
+        kprintln!("im in a bear suite");
     }
 
     shell::shell("> ")
 }
 
 #[no_mangle]
-#[inline(never)]
-pub extern "C" fn kernel_main(cpuid: u64) -> ! {
-    let mut pin = pi::gpio::Gpio::new(16).into_output();
-
-    pi::timer::spin_sleep_ms(1000);
-    pin.set();
-
-    pi::timer::spin_sleep_ms(1000);
-    pin.clear();
+#[cfg(not(test))]
+pub extern "C" fn kernel_main() -> ! {
+    // hello blink
+    {
+        let mut pin = pi::gpio::Gpio::new(16).into_output();
+        pi::timer::spin_sleep_ms(1000);
+        pin.set();
+        pi::timer::spin_sleep_ms(1000);
+        pin.clear();
+    }
 
     let el = unsafe { aarch64::current_el() };
-    kprintln!("start kernel main at CPU{} [EL{}]", cpuid, el);
+    let cpuid = unsafe { aarch64::affinity() };
+    kprintln!("start kernel main at [CPU{} EL{}]", cpuid, el);
 
     /*
     init_logger().unwrap();
@@ -123,19 +129,40 @@ pub extern "C" fn kernel_main(cpuid: u64) -> ! {
     /*
     kprintln!("initialize mmu");
     unsafe { mmu::init_mmu(); }
-
-    init_heap();
     */
 
+
+    kprintln!("allocator");
     unsafe {
         ALLOCATOR.initialize();
+    }
+    kprintln!("fs");
+    unsafe {
         FILE_SYSTEM.initialize();
     }
 
+
+
+    kprintln!("timer");
+
+    // enable
+    unsafe {
+        asm!("msr daifclr, #2" :::: "volatile");
+    }
+
+    pi::interrupt::Controller::new().enable(pi::interrupt::Interrupt::Timer1);
+    pi::timer::tick_in(2 * 1000 * 1000);
+
+    unsafe { asm!("brk 2" :::: "volatile"); }
+
     test_timers();
 
-    //init_fb(480, 320);
-    init_fb(1920, 1080);
+    init_fb(480, 320);
+    //init_fb(1920, 1080);
+    //
+
+    //shell::shell("> ");
+
 
     if true {
         unsafe {
@@ -148,45 +175,10 @@ pub extern "C" fn kernel_main(cpuid: u64) -> ! {
             " : : "r" (el0_main as *const ()) : : "volatile");
         }
     }
-
-    shell::shell("> ");
-
-    for _ in 0..100 {
-        pi::timer::spin_sleep_ms(100);
-        pin.set();
-
-        kprintln!("fuck u");
-
-        pi::timer::spin_sleep_ms(100);
-        pin.clear();
-    }
-
-    panic!("dont panic!");
-
-    /*
-    kprintln!("start kernel main at CPU{}", cpuid);
-    /*
-    if cpuid != 0 {
-        loop {
-            kprintln!("CPU{}", cpuid);
-        }
-    }
-    */
-    */
-
-
-    /*
-    info!("init heap");
-    init_heap();
-
-    info!("init fs");
-    FILE_SYSTEM.initialize();
-
-        */
-
-    shell::shell("> ")
+    unreachable!("goto EL0")
 }
 
+#[cfg(not(test))]
 fn init_fb(w: u32, h: u32) {
     kprintln!("initialize fb {}x{}", w, h);
     if let Some(mut fb) = fb::FrameBuffer::new(w, h, 32) {
@@ -217,11 +209,11 @@ fn init_fb(w: u32, h: u32) {
 
 fn test_timers() {
     kprint!("Waiting 1000000 CPU cycles (ARM CPU): ");
-    util::wait_cycles(1000000);
+    pi::common::spin_sleep_cycles(1000000);
     kprintln!("OK");
 
     kprint!("Waiting 1000000 microsec (ARM CPU): ");
-    util::wait_msec(1000000);
+    pi::common::spin_sleep_us(1000000);
     kprintln!("OK");
 
     kprint!("Waiting 1000000 microsec (BCM System Timer): ");

@@ -7,6 +7,19 @@ use allocator::linked_list::LinkedList;
 /// A simple allocator that allocates based on size classes.
 pub struct Allocator {
     // FIXME: Add the necessary fields.
+    bin8: LinkedList,
+    bin16: LinkedList,
+    bin32: LinkedList,
+    bin64: LinkedList,
+    bin128: LinkedList,
+    bin256: LinkedList,
+    bin512: LinkedList,
+    bin1024: LinkedList,
+    bin2048: LinkedList,
+    bin4096: LinkedList,
+
+    start: usize,
+    end: usize,
 }
 
 impl Allocator {

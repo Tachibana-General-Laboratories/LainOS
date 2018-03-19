@@ -1,7 +1,7 @@
 use std::io;
 use fat32::traits::BlockDevice;
 
-use util::wait_msec;
+use pi::common::spin_sleep_us;
 
 extern "C" {
     /// A global representing the last SD controller error that occured.
@@ -30,7 +30,7 @@ extern "C" {
 // for use by `libsd`.
 #[no_mangle]
 pub extern "C" fn wait_micros(n: u32) {
-    wait_msec(n)
+    spin_sleep_us(n)
 }
 
 #[derive(Debug)]

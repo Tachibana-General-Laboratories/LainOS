@@ -1,4 +1,3 @@
-
 mod align_util {
     use allocator::util::{align_up, align_down};
 
@@ -159,6 +158,10 @@ mod allocator {
         test_layouts!(layouts, start, end, a);
     });
 
+    fn scribble(ptr: *mut u8, size: usize) {
+        unsafe { ::std::ptr::write_bytes(ptr, 0xAF, size); }
+    }
+
     test_allocators!(bin_dealloc_s, bump_dealloc_s, 4096, |(_, _, mut a)| {
         let layouts = [
             layout!(16, 16),
@@ -168,17 +171,57 @@ mod allocator {
 
         let mut pointers: Vec<(usize, Layout)> = vec![];
         for layout in &layouts {
-            let ptr = a.alloc(layout.clone()).unwrap() as usize;
-            pointers.push((ptr, layout.clone()));
+            let ptr = a.alloc(layout.clone()).unwrap();
+            scribble(ptr, layout.size());
+            pointers.push((ptr as usize, layout.clone()));
         }
 
         // Just check that deallocation doesn't panic.
         for (ptr, layout) in pointers {
+            scribble(ptr as *mut u8, layout.size());
             a.dealloc(ptr as *mut u8, layout);
         }
     });
 
-    test_allocators!(@bin, bin_dealloc, 8192, |(_, _, mut a)| {
+    test_allocators!(@bin, bin_dealloc_1, 65536, |(_, _, mut a)| {
+        let layouts = [
+            layout!(16, 16),
+            layout!(16, 256),
+            layout!(32, 4),
+            layout!(32, 1024),
+            layout!(4, 1024),
+            layout!(4, 32),
+        ];
+
+        // tests for resonable internal fragmentation, reuse of aligned blocks,
+        // and proper alignment after binning
+        for (i, layout) in layouts.iter().enumerate() {
+            let mut ptrs = vec![];
+            for _ in 0..(25 + i * 2) {
+                let ptr = a.alloc(layout.clone()).expect("allocation");
+                assert!(ptr as usize % layout.align() == 0,
+                    "{:x} is not aligned to {}", ptr as usize, layout.align());
+                scribble(ptr, layout.size());
+                ptrs.push((ptr, layout.clone()));
+            }
+
+            for (ptr, layout) in ptrs {
+                a.dealloc(ptr, layout);
+            }
+        }
+
+        for _ in 0..500 {
+            for layout in &layouts {
+                let ptr = a.alloc(layout.clone()).expect("allocation");
+                scribble(ptr, layout.size());
+                assert!(ptr as usize % layout.align() == 0,
+                    "{:x} is not aligned to {}", ptr as usize, layout.align());
+                a.dealloc(ptr, layout.clone());
+            }
+        }
+    });
+
+    test_allocators!(@bin, bin_dealloc_2, 8192, |(_, _, mut a)| {
         let layouts = [
             layout!(3072, 16),
             layout!(512, 32),
@@ -189,10 +232,13 @@ mod allocator {
         for _ in 0..1000 {
             let mut ptrs = vec![];
             for layout in &layouts {
-                ptrs.push(a.alloc(layout.clone()).expect("allocation") as usize);
+                let ptr = a.alloc(layout.clone()).expect("allocation");
+                scribble(ptr, layout.size());
+                ptrs.push(ptr as usize);
             }
 
             for (layout, ptr) in layouts.iter().zip(ptrs.into_iter()) {
+                scribble(ptr as *mut u8, layout.size());
                 a.dealloc(ptr as *mut u8, layout.clone());
             }
         }
@@ -291,4 +337,3 @@ mod linked_list {
         assert_eq!(iter.next(), None);
     }
 }
-

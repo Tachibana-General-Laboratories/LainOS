@@ -9,7 +9,7 @@ pub use fat32::traits;
 use mutex::Mutex;
 use self::sd::Sd;
 
-pub struct FileSystem(Mutex<Option<Shared<VFat>>>);
+pub struct FileSystem(pub Mutex<Option<Shared<VFat>>>);
 
 impl FileSystem {
     /// Returns an uninitialized `FileSystem`.

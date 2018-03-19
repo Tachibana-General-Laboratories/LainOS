@@ -78,9 +78,11 @@ impl LinkedList {
     ///
     /// # Safety
     ///
-    /// The caller must ensure that `item` refers to valid, unique, writeable
-    /// memory at least `usize` in size. Barring the uniqueness constraint, this
-    /// is equivalent to ensuring that `*item = some_usize` is a safe operation.
+    /// The caller must ensure that `item` refers to unique, writeable memory at
+    /// least `usize` in size that is valid as long as `item` resides in `self`.
+    /// Barring the uniqueness constraint, this is equivalent to ensuring that
+    /// `*item = some_usize` is a safe operation as long as the pointer resides
+    /// in `self`.
     pub unsafe fn push(&mut self, item: *mut usize) {
         *item = self.head as usize;
         self.head = item;

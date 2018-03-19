@@ -39,7 +39,6 @@ pub unsafe fn affinity() -> usize {
     asm!("mrs     $0, mpidr_el1
           and     $0, $0, #3"
           : "=r"(x));
-
     x
 }
 

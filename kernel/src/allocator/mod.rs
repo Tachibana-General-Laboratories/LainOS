@@ -4,6 +4,8 @@ mod util;
 #[path = "bump.rs"]
 mod imp;
 
+use slab_allocator::Heap;
+
 #[cfg(test)]
 mod tests;
 
@@ -12,8 +14,9 @@ use alloc::heap::{Alloc, AllocErr, Layout};
 use std::cmp::max;
 
 /// Thread-safe (locking) wrapper around a particular memory allocator.
-#[derive(Debug)]
-pub struct Allocator(Mutex<Option<imp::Allocator>>);
+//#[derive(Debug)]
+//pub struct Allocator(Mutex<Option<imp::Allocator>>);
+pub struct Allocator(Mutex<Option<Heap>>);
 
 impl Allocator {
     /// Returns an uninitialized `Allocator`.
@@ -31,7 +34,9 @@ impl Allocator {
     /// Panics if the system's memory map could not be retrieved.
     pub fn initialize(&self) {
         let (start, end) = memory_map().expect("failed to find memory map");
-        *self.0.lock() = Some(imp::Allocator::new(start, end));
+        let size = end - start;
+        let heap = unsafe { Heap::new(start, size) };
+        *self.0.lock() = Some(heap);
     }
 }
 
@@ -90,5 +95,5 @@ fn memory_map() -> Option<(usize, usize)> {
     let binary_end = unsafe { (&_end as *const u8) as u32 };
 
     //unimplemented!("memory map fetch")
-    Some((0x0400_0000, 0x0800_0000))
+    Some((0x0200_0000, 0x0400_0000))
 }

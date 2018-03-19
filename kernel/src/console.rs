@@ -2,8 +2,6 @@ use std::io;
 use std::fmt;
 
 use pi::uart::MiniUart;
-//use pi::uart0::Uart0 as MiniUart;
-
 use mutex::Mutex;
 
 /// A global singleton allowing read/write access to the console.
@@ -48,19 +46,13 @@ impl Console {
 
 impl io::Read for Console {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        for c in buf.iter_mut() {
-            *c = self.read_byte();
-        }
-        Ok(buf.len())
+        self.inner().read(buf)
     }
 }
 
 impl io::Write for Console {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        for &c in buf.iter() {
-            self.write_byte(c);
-        }
-        Ok(buf.len())
+        self.inner().write(buf)
     }
 
     fn flush(&mut self) -> io::Result<()> {
@@ -70,15 +62,7 @@ impl io::Write for Console {
 
 impl fmt::Write for Console {
     fn write_str(&mut self, s: &str) -> fmt::Result {
-        let mut uart = self.inner();
-        for c in s.chars() {
-            // convert newline to carrige return + newline
-            if c == '\n' {
-                uart.write_byte(b'\r');
-            }
-            uart.write_byte(c as u8)
-        }
-        Ok(())
+        self.inner().write_str(s)
     }
 }
 

@@ -68,22 +68,13 @@ start_el2:
     // setup SCTLR access
     mov     x2, #0x0800
     movk    x2, #0x30d0, lsl #16
-    orr     x0, x0, #(0x1 << 2)     // The C bit on (data cache).
-    orr     x0, x0, #(0x1 << 12)    // The I bit on (instruction cache)
+    //orr     x0, x0, #(0x1 << 2)     // The C bit on (data cache).
+    //orr     x0, x0, #(0x1 << 12)    // The I bit on (instruction cache)
     msr     sctlr_el1, x2
-
-/*
-    cpuid   x7
-    cbnz    x7, 1f
-    bl      init_mmu
-1:
-*/
 
     // enable FP/SIMD at EL1
     mov     x0, #3 << 20
     msr     cpacr_el1, x0
-
-    cpuid   x7
 
     // stack for cpu0
     ldr     x0, =_stack_core0_el0
@@ -131,27 +122,26 @@ set_stacks:
 start_el1:
     // only for core0
     cpuid   x7
-    cbnz    x7, rust_main
+    cbnz    x7, go_main
 
 core0:
     // set up exception handlers
     ldr     x2, =_vector_table
-    msr     vbar_el1, x2
+    msr     VBAR_EL1, x2
 
     // clear bss
+zero_bss:
+    // load the start address and number of bytes in BSS section
     ldr     x1, =__bss_start
-    ldr     w2, =__bss_size
-bss_clear_loop:
-    cbz     w2, rust_main
+    ldr     x2, =__bss_size
+zero_bss_loop:
+    cbz     x2, go_main
     str     xzr, [x1], #8
-    sub     w2, w2, #1
-    cbnz    w2, bss_clear_loop
+    sub     x2, x2, #1
+    cbnz    x2, zero_bss_loop
 
-    // jump to C code, should not return
-rust_main:
-    cpuid   x0
+go_main:
     bl      kernel_main
-    // for failsafe, halt this core
     b       halt
 
 
@@ -175,35 +165,24 @@ rust_main:
 //  X30 link register
 //  SP stack pointer (XZR)
 
-.macro HANDLER source, kind
-.align 7
-    stp     x30, x0, [SP, #-16]!
-    mov     x0, \source
-    movk    x0, \kind, LSL #16
-    bl      context_save
-    bl      context_restore
-    ldp     x30, x0, [SP], #16
-    eret
-.endm
-
 context_save:
     sub     SP, SP, #272
 
-    stp     xzr, x29, [SP, #32 ]
-    stp     x28, x27, [SP, #48 ]
-    stp     x26, x25, [SP, #64 ]
-    stp     x24, x23, [SP, #80 ]
-    stp     x22, x21, [SP, #96 ]
-    stp     x20, x19, [SP, #112]
-    stp     x18, x17, [SP, #128]
-    stp     x16, x15, [SP, #144]
-    stp     x14, x13, [SP, #160]
-    stp     x12, x11, [SP, #176]
-    stp     x10, x9 , [SP, #192]
-    stp     x8 , x7 , [SP, #208]
-    stp     x6 , x5 , [SP, #224]
-    stp     x4 , x3 , [SP, #240]
-    stp     x2 , x1 , [SP, #256]
+    stp     x1 , x2 , [SP, #32 ]
+    stp     x3 , x4 , [SP, #48 ]
+    stp     x5 , x2 , [SP, #64 ]
+    stp     x7 , x2 , [SP, #80 ]
+    stp     x9 , x2 , [SP, #96 ]
+    stp     x11, x1 , [SP, #112]
+    stp     x13, x1 , [SP, #128]
+    stp     x15, x1 , [SP, #144]
+    stp     x17, x1 , [SP, #160]
+    stp     x19, x1 , [SP, #176]
+    stp     x21, x9 , [SP, #192]
+    stp     x23, x7 , [SP, #208]
+    stp     x25, x5 , [SP, #224]
+    stp     x27, x3 , [SP, #240]
+    stp     x29, xzr, [SP, #256]
 
     // TODO: q31..q0
 
@@ -212,56 +191,50 @@ context_save:
     mrs     x3, SPSR_EL1
     mrs     x4, ELR_EL1
 
-    stp     x1, x2, [SP, #0]
-    stp     x3, x4, [SP, #16]
+    stp     x4, x3, [SP, #0]
+    stp     x2, x1, [SP, #16]
 
     mrs     x1, ESR_EL1
     mov     x2, SP
-
-    enable_interrupts
-    stp     x30, x0, [SP, #-16]!
-    bl      handle_exception
-    ldp     x30, x0, [SP], #16
-    disable_interrupts
 
     ret
 
 .global context_restore
 context_restore:
-    ldp     x1, x2, [SP, #0]
-    ldp     x3, x4, [SP, #16]
+    ldp     x4, x3, [SP, #0]
+    ldp     x2, x1, [SP, #16]
 
     msr     TPIDR_EL0, x1
     msr     SP_EL0, x2
     msr     SPSR_EL1, x3
     msr     ELR_EL1, x4
 
-    stp     xzr, x29, [SP, #32 ]
-    stp     x28, x27, [SP, #48 ]
-    stp     x26, x25, [SP, #64 ]
-    stp     x24, x23, [SP, #80 ]
-    stp     x22, x21, [SP, #96 ]
-    stp     x20, x19, [SP, #112]
-    stp     x18, x17, [SP, #128]
-    stp     x16, x15, [SP, #144]
-    stp     x14, x13, [SP, #160]
-    stp     x12, x11, [SP, #176]
-    stp     x10, x9 , [SP, #192]
-    stp     x8 , x7 , [SP, #208]
-    stp     x6 , x5 , [SP, #224]
-    stp     x4 , x3 , [SP, #240]
-    stp     x2 , x1 , [SP, #256]
-
     // TODO: q31..q0
+
+    stp     x1 , x2 , [SP, #32 ]
+    stp     x3 , x4 , [SP, #48 ]
+    stp     x5 , x2 , [SP, #64 ]
+    stp     x7 , x2 , [SP, #80 ]
+    stp     x9 , x2 , [SP, #96 ]
+    stp     x11, x1 , [SP, #112]
+    stp     x13, x1 , [SP, #128]
+    stp     x15, x1 , [SP, #144]
+    stp     x17, x1 , [SP, #160]
+    stp     x19, x1 , [SP, #176]
+    stp     x21, x9 , [SP, #192]
+    stp     x23, x7 , [SP, #208]
+    stp     x25, x5 , [SP, #224]
+    stp     x27, x3 , [SP, #240]
+    stp     x29, xzr, [SP, #256]
 
     add     SP, SP, #272
 
     ret
 
-
 .global xsvc
 xsvc:
     #mov x8, #666
+    #mov x29, #999
     svc #666
     ret
 

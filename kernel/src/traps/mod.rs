@@ -48,14 +48,23 @@ pub extern fn handle_exception(info: Info, esr: u32, tf: &mut TrapFrame) {
     match (info.kind, info.source, syndrome) {
         (Kind::Synchronous, Source::LowerAArch64, Syndrome::Svc(num)) => {
             //handle_syscall(num, tf);
-            kprintln!("--- syscall {:?}", num);
+            kprintln!("--- SYSCALL {:?}", num);
             tf.x0 = num as u64;
             return;
         }
+        (Kind::Synchronous, _, Syndrome::Brk(num)) => {
+            kprintln!("--- BRK {:?}", num);
+            tf.elr += 4;
+            return;
+        }
+        (Kind::Irq, _, _) => {
+            //handle_syscall(num, tf);
+            panic!("--- IRQ {:?} esr: {:08X}", info.source, esr);
+            //handle_irq();
+            return;
+        }
         _ => {
-            kprintln!("    {:?} {:?} TRAP from {:?}: ", info.kind, syndrome, info.source);
-            kprintln!("{:?}", tf);
-            panic!("it's a trap");
+            panic!("IT'S A TRAP: {:?} {:?} {:?}", info, syndrome, tf);
         }
     }
 }
