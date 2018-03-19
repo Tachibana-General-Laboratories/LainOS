@@ -17,6 +17,27 @@ pub fn spin_sleep_cycles(cycles: u32) {
     }
 }
 
+/// Wait N microsec (ARM CPU only)
+#[inline(always)]
+pub fn spin_sleep_us(n: u32) {
+    let f: u32;
+    let mut t: u32;
+    let mut r: u32;
+
+    unsafe {
+        // get the current counter frequency
+        asm!("mrs $0, cntfrq_el0" : "=r"(f) : : : "volatile");
+        // read the current counter
+        asm!("mrs $0, cntpct_el0" : "=r"(t) : : : "volatile");
+        // calculate expire value for counter
+        t += ((f / 1000).wrapping_mul(n)) / 1000;
+        while {
+            asm!("mrs $0, cntpct_el0" : "=r"(r) : : : "volatile");
+            r < t
+        } {}
+    }
+}
+
 
 #[inline(always)]
 pub fn spin_wait<F>(mut f: F)
