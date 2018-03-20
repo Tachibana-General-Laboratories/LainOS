@@ -1,3 +1,5 @@
+#![deny(unreachable_pattern)]
+
 #[derive(Debug, PartialEq, Copy, Clone)]
 pub enum Fault {
     AddressSize,
@@ -88,15 +90,15 @@ impl From<u32> for Syndrome {
             0b000001 => WfiWfe,
             0b000011 => McrMrc,
             0b000100 | 0b000101 => McrrMrrc,
-            0b000100 => LdcStc,
+            0b000110 => LdcStc,
             0b000111 => SimdFp,
             0b001000 => Vmrs,
             0b001100 => Mrrc,
             0b001110 => IllegalExecutionState,
 
-            0b100001 | 0b010101 => Svc(esr as u16),
-            0b100010 | 0b010110 => Hvc(esr as u16),
-            0b100011 | 0b010111 => Smc(esr as u16),
+            0b010001 | 0b010101 => Svc(esr as u16),
+            0b010010 | 0b010110 => Hvc(esr as u16),
+            0b010011 | 0b010111 => Smc(esr as u16),
             0b011000 => MsrMrsSystem,
 
             0b101111 => SError,

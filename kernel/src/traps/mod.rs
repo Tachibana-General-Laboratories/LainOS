@@ -43,28 +43,34 @@ pub struct Info {
 /// the trap frame for the exception.
 #[no_mangle]
 pub extern fn handle_exception(info: Info, esr: u32, tf: &mut TrapFrame) {
-    let syndrome = Syndrome::from(esr as u32);
+    use self::Kind::*;
+    use self::Source::*;
+    use self::Interrupt::*;
 
+    let syndrome = Syndrome::from(esr as u32);
+    let ctl = Controller::new();
     match (info.kind, info.source, syndrome) {
-        (Kind::Synchronous, Source::LowerAArch64, Syndrome::Svc(num)) => {
-            //handle_syscall(num, tf);
-            kprintln!("--- SYSCALL {:?}", num);
-            tf.x0 = num as u64;
+
+        (Synchronous, LowerAArch64, Syndrome::Svc(num)) => {
+            handle_syscall(num, tf);
             return;
         }
-        (Kind::Synchronous, _, Syndrome::Brk(num)) => {
-            kprintln!("--- BRK {:?}", num);
+
+        (Synchronous, LowerAArch64, Syndrome::Brk(num)) => {
+            kprintln!("--- BRK {:?} at {:08X}", num, tf.elr);
             tf.elr += 4;
             return;
         }
-        (Kind::Irq, _, _) => {
-            //handle_syscall(num, tf);
-            panic!("--- IRQ {:?} esr: {:08X}", info.source, esr);
-            //handle_irq();
-            return;
-        }
-        _ => {
-            panic!("IT'S A TRAP: {:?} {:?} {:?}", info, syndrome, tf);
-        }
+
+        (Irq, LowerAArch64, _) if ctl.is_pending(Timer1) => return handle_irq(Timer1, tf),
+        (Irq, LowerAArch64, _) if ctl.is_pending(Timer3) => return handle_irq(Timer3, tf),
+        (Irq, LowerAArch64, _) if ctl.is_pending(Usb   ) => return handle_irq(Usb   , tf),
+        (Irq, LowerAArch64, _) if ctl.is_pending(Gpio0 ) => return handle_irq(Gpio0 , tf),
+        (Irq, LowerAArch64, _) if ctl.is_pending(Gpio1 ) => return handle_irq(Gpio1 , tf),
+        (Irq, LowerAArch64, _) if ctl.is_pending(Gpio2 ) => return handle_irq(Gpio2 , tf),
+        (Irq, LowerAArch64, _) if ctl.is_pending(Gpio3 ) => return handle_irq(Gpio3 , tf),
+        (Irq, LowerAArch64, _) if ctl.is_pending(Uart  ) => return handle_irq(Uart  , tf),
+
+        _ => panic!("IT'S A TRAP: {:?} {:?} {:?}", info, syndrome, tf),
     }
 }

@@ -62,7 +62,7 @@ pub union VFatDirEntry {
 }
 
 impl VFatDirEntry {
-    fn and_end(&self) -> Option<&Self> {
+    fn and_end(self) -> Option<Self> {
         if unsafe { self.unknown.stub[0] != 0 } {
             Some(self)
         } else {
@@ -116,15 +116,28 @@ impl VFatDirEntry {
         }
     }
 
-    fn long_name<'a>(&'a self) -> impl Iterator<Item=char> + 'a {
+    fn long_name(&self) -> String {
         use std::char::{decode_utf16, REPLACEMENT_CHARACTER};
-        let name0 = decode_utf16(unsafe { self.long_filename.name0.iter().cloned() });
-        let name1 = decode_utf16(unsafe { self.long_filename.name1.iter().cloned() });
-        let name2 = decode_utf16(unsafe { self.long_filename.name2.iter().cloned() });
-        name0.chain(name1).chain(name2)
-            .take_while(|r| r.is_ok())
-            .map(|r| r.unwrap_or('#'))
-            .take_while(|&r| r != '\u{0}' && r != '\u{ffff}')
+
+        unsafe {
+            let name0 = (&self.long_filename.name0 as *const [u16; 5]).read_unaligned();
+            let name1 = (&self.long_filename.name1 as *const [u16; 6]).read_unaligned();
+            let name2 = (&self.long_filename.name2 as *const [u16; 2]).read_unaligned();
+
+            let name0 = name0.iter().cloned();
+            let name1 = name1.iter().cloned();
+            let name2 = name2.iter().cloned();
+
+            let name0 = decode_utf16(name0);
+            let name1 = decode_utf16(name1);
+            let name2 = decode_utf16(name2);
+
+            name0.chain(name1).chain(name2)
+                .take_while(|r| r.is_ok())
+                .map(|r| r.unwrap_or('#'))
+                .take_while(|&r| r != '\u{0}' && r != '\u{ffff}')
+                .collect()
+        }
     }
 
     fn short_name(&self) -> String {
@@ -215,11 +228,11 @@ pub struct DirIter {
 }
 
 impl DirIter {
-    fn next_dir_entry(&mut self) -> Option<&VFatDirEntry> {
+    fn next_dir_entry(&mut self) -> Option<VFatDirEntry> {
         if self.current < self.entries.len()  {
             Some(unsafe {
                 let p = self.entries.as_ptr() as *const VFatDirEntry;
-                &*(p.offset(self.current as isize))
+                p.offset(self.current as isize).read_unaligned()
             })
         } else {
             None
@@ -231,7 +244,7 @@ impl Iterator for DirIter {
     type Item = Entry;
     fn next(&mut self) -> Option<Self::Item> {
         loop {
-            let e = *self.next_dir_entry().and_then(VFatDirEntry::and_end)?;
+            let e = self.next_dir_entry().and_then(VFatDirEntry::and_end)?;
             self.current += 1;
 
             if e.is_unused() {
@@ -239,7 +252,7 @@ impl Iterator for DirIter {
             }
 
             if e.is_long()  {
-                let s: String = e.long_name().collect();
+                let s: String = e.long_name();
                 if s.len() >= 3 && &s[..3] == "._." {
                     continue;
                 }

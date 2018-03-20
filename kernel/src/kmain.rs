@@ -15,6 +15,7 @@
 #![feature(fn_must_use)]
 #![feature(alloc, allocator_api, global_allocator)]
 #![feature(ptr_internals)]
+#![feature(nonzero)]
 
 #[macro_use]
 extern crate bitflags;
@@ -54,23 +55,28 @@ pub mod console;
 
 //pub mod sd;
 //pub mod sdn;
-pub mod gles;
+//pub mod gles;
 
 
 #[cfg(not(test))]
 pub mod fs;
 pub mod allocator;
 
-use alloc::*;
-
 use console::{kprint, kprintln};
+
+use allocator::Allocator;
+use fs::FileSystem;
+use process::GlobalScheduler;
 
 #[global_allocator]
 #[cfg(not(test))]
-pub static mut ALLOCATOR: allocator::Allocator = allocator::Allocator::uninitialized();
+pub static mut ALLOCATOR: Allocator = allocator::Allocator::uninitialized();
 
 #[cfg(not(test))]
-pub static FILE_SYSTEM: fs::FileSystem = fs::FileSystem::uninitialized();
+pub static FILE_SYSTEM: FileSystem = FileSystem::uninitialized();
+#[cfg(not(test))]
+pub static SCHEDULER: GlobalScheduler = GlobalScheduler::uninitialized();
+
 
 const BINARY_START_ADDR: usize = 0x8_0000; // 512kb
 const KERNEL_SPACE: usize = 0xFFFFFF80_00000000;
@@ -91,18 +97,30 @@ const ADDR_2GB: usize   = 0x8000_0000;
 
 extern "C" {
     fn xsvc(a: u64, b: u64, c: u64, d: u64, ) -> u64;
+    fn context_restore();
+    static _stack_core0_el0: *mut usize;
+    static _stack_core0_el1: *mut usize;
 }
 
 #[no_mangle]
 #[cfg(not(test))]
-pub unsafe extern "C" fn el0_main() -> ! {
+pub extern "C" fn el0_main() -> ! {
+    kprintln!("im in a bear suite");
+    kprintln!("fuck you shit: {}", 555);
+    unsafe { asm!("brk 1" :::: "volatile"); }
+    /*
+        kprintln!("fuck you shit: {}", 555);
+    unsafe { asm!("brk 2" :::: "volatile"); }
+        kprintln!("im in a bear suite");
+        */
     for _ in 0..4 {
-        let v = xsvc(111, 222, 333, 444);
+        let v = unsafe { xsvc(111, 222, 333, 444) };
         kprintln!("fuck you shit: {}", v);
         kprintln!("im in a bear suite");
+        unsafe { asm!("brk 1" :::: "volatile"); }
     }
 
-    shell::shell("> ")
+    shell::shell("user0> ")
 }
 
 #[no_mangle]
@@ -111,10 +129,11 @@ pub extern "C" fn kernel_main() -> ! {
     // hello blink
     {
         let mut pin = pi::gpio::Gpio::new(16).into_output();
-        pi::timer::spin_sleep_ms(1000);
         pin.set();
-        pi::timer::spin_sleep_ms(1000);
+        pi::timer::spin_sleep_ms(500);
         pin.clear();
+        pi::timer::spin_sleep_ms(500);
+        pin.set();
     }
 
     let el = unsafe { aarch64::current_el() };
@@ -137,45 +156,26 @@ pub extern "C" fn kernel_main() -> ! {
         ALLOCATOR.initialize();
     }
     kprintln!("fs");
-    unsafe {
-        FILE_SYSTEM.initialize();
+    FILE_SYSTEM.initialize();
+
+    if true {
+        use pi::interrupt::{Controller, Interrupt};
+        kprintln!("timer");
+
+        Controller::new().enable(Interrupt::Timer1);
+        pi::timer::tick_in(process::TICK);
     }
-
-
-
-    kprintln!("timer");
-
-    // enable
-    unsafe {
-        asm!("msr daifclr, #2" :::: "volatile");
-    }
-
-    pi::interrupt::Controller::new().enable(pi::interrupt::Interrupt::Timer1);
-    pi::timer::tick_in(2 * 1000 * 1000);
-
-    unsafe { asm!("brk 2" :::: "volatile"); }
 
     test_timers();
 
-    init_fb(480, 320);
+    //init_fb(480, 320);
     //init_fb(1920, 1080);
     //
 
-    //shell::shell("> ");
+    //shell::shell("kernel> ");
 
-
-    if true {
-        unsafe {
-            asm!("
-            mov x1, $0;
-            msr elr_el1, x1;
-            mov x1, #0x3c0;
-            msr spsr_el1, x1;
-            eret;
-            " : : "r" (el0_main as *const ()) : : "volatile");
-        }
-    }
-    unreachable!("goto EL0")
+    kprintln!("EL0:");
+    SCHEDULER.start()
 }
 
 #[cfg(not(test))]
@@ -207,6 +207,7 @@ fn init_fb(w: u32, h: u32) {
     }
 }
 
+#[cfg(not(test))]
 fn test_timers() {
     kprint!("Waiting 1000000 CPU cycles (ARM CPU): ");
     pi::common::spin_sleep_cycles(1000000);

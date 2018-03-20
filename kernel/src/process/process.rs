@@ -1,8 +1,10 @@
+use core::mem;
+use core::nonzero::NonZero;
 use traps::TrapFrame;
 use process::{State, Stack};
 
 /// Type alias for the type of a process ID.
-pub type Id = u64;
+pub type Id = NonZero<u64>;
 
 /// A structure that represents the complete state of a process.
 #[derive(Debug)]
@@ -22,7 +24,11 @@ impl Process {
     /// If enough memory could not be allocated to start the process, returns
     /// `None`. Otherwise returns `Some` of the new `Process`.
     pub fn new() -> Option<Self> {
-        unimplemented!("Process::new()")
+        Stack::new().map(|stack| {
+            let state = State::Ready;
+            let mut trap_frame = Box::new(unsafe { mem::zeroed() });
+            Self { trap_frame, stack, state }
+        })
     }
 
     /// Returns `true` if this process is ready to be scheduled.
@@ -40,6 +46,32 @@ impl Process {
     ///
     /// Returns `false` in all other cases.
     pub fn is_ready(&mut self) -> bool {
-        unimplemented!("Process::is_ready()")
+        let p = self as *mut Self;
+        let ret = match self.state {
+            State::Ready => true,
+            State::Running => false,
+            State::Waiting(ref mut f) => {
+                let p = unsafe { &mut *p };
+                let r = f(p);
+                mem::forget(p);
+                r
+            }
+        };
+        if ret {
+            self.state = State::Ready;
+        }
+        ret
+    }
+
+    pub fn set_id(&mut self, id: Option<Id>) {
+        if let Some(id) = id {
+            self.trap_frame.tpidr = id.get();
+        } else {
+            self.trap_frame.tpidr = 0;
+        }
+    }
+
+    pub fn id(&self) -> Option<Id> {
+        NonZero::new(self.trap_frame.tpidr)
     }
 }

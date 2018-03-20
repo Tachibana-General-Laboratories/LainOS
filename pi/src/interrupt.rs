@@ -4,6 +4,7 @@ use volatile::{Volatile, ReadVolatile};
 
 const INT_BASE: usize = IO_BASE + 0xB000 + 0x200;
 
+#[repr(u32)]
 #[derive(Copy, Clone, PartialEq)]
 pub enum Interrupt {
     Timer1 = 1,
@@ -48,9 +49,9 @@ impl Controller {
     pub fn enable(&mut self, int: Interrupt) {
         let int = int as u32;
         if int < 32 {
-            self.registers.Enable_IRQs_1.write(1 << int);
+            self.registers.Enable_IRQs_1.or_mask(1 << int);
         } else {
-            self.registers.Enable_IRQs_2.write(1 << (int - 32));
+            self.registers.Enable_IRQs_2.or_mask(1 << (int - 32));
         }
     }
 
@@ -58,9 +59,9 @@ impl Controller {
     pub fn disable(&mut self, int: Interrupt) {
         let int = int as u32;
         if int < 32 {
-            self.registers.Disable_IRQs_1.write(1 << int);
+            self.registers.Disable_IRQs_1.or_mask(1 << int);
         } else {
-            self.registers.Disable_IRQs_2.write(1 << (int - 32));
+            self.registers.Disable_IRQs_2.or_mask(1 << (int - 32));
         }
     }
 

@@ -2,6 +2,7 @@
 #![feature(entry_and_modify)]
 #![feature(option_filter)]
 #![allow(safe_packed_borrows)]
+#![feature(pointer_methods)]
 
 #[cfg(not(target_endian="little"))]
 compile_error!("only little endian platforms supported");

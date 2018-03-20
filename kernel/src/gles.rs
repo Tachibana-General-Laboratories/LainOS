@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(non_camel_case_types)]
+
 use pi::common::IO_BASE;
 use pi::mbox::{self, gpu2arm};
 

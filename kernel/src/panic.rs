@@ -19,10 +19,3 @@ pub extern fn panic_fmt(msg: fmt::Arguments, file: &'static str, line: u32, col:
 
     loop { unsafe { asm!("wfe") } }
 }
-
-#[allow(non_snake_case)]
-#[no_mangle]
-pub extern "C" fn _Unwind_Resume() -> ! {
-    kprintln!("_Unwind_Resume");
-    loop { }
-}

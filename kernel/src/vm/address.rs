@@ -1,4 +1,4 @@
-use std::fmt;
+use core::fmt;
 
 /// A virtual address.
 pub struct VirtualAddr(usize);

@@ -54,7 +54,7 @@ qemu2: all
 		-drive file=../fs.img,if=sd,format=raw \
 		-serial /dev/tty5 \
 		-serial stdio \
-		-kernel $(KERNEL).img
+		-kernel $(KERNEL).elf -d int
 
 test:
 	cargo test

@@ -48,3 +48,10 @@ pub fn nop() {
         asm!("nop" :::: "volatile");
     }
 }
+
+pub fn wait_for_interrupt() {
+    unsafe {
+        asm!("wfi" :::: "volatile");
+    }
+}
+

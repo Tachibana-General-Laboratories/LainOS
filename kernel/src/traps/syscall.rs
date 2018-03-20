@@ -1,5 +1,7 @@
 use traps::TrapFrame;
 
+use console::kprintln;
+
 /// Sleep for `ms` milliseconds.
 ///
 /// This system call takes one parameter: the number of milliseconds to sleep.
@@ -12,5 +14,9 @@ pub fn sleep(ms: u32, tf: &mut TrapFrame) {
 }
 
 pub fn handle_syscall(num: u16, tf: &mut TrapFrame) {
-    unimplemented!("handle_syscall()")
+    kprintln!("--- SYSCALL {:?}, x0-3: {} {} {} {}",
+                num, tf.x0, tf.x1, tf.x2, tf.x3);
+
+    //kprintln!("--- SYSCALL {:?}, {:?}", num, tf);
+    tf.x0 = num as u64;
 }

@@ -1,5 +1,4 @@
-SECTIONS
-{
+SECTIONS {
     . = 0x80000;
     .text : {
         KEEP(*(.text.boot))
@@ -16,8 +15,10 @@ SECTIONS
         *(.data .data.* .gnu.linkonce.d*)
     }
 
+    . = ALIGN(4096);
+
     .bss (NOLOAD) : {
-        . = ALIGN(16);
+        . = ALIGN(32);
         __bss_start = .;
         *(.bss .bss.*)
         *(COMMON)

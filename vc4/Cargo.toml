@@ -1,6 +1,0 @@
-[package]
-name = "vc4"
-version = "0.1.0"
-authors = ["Lain-dono <lain.dono@gmail.com>"]
-
-[dependencies]
