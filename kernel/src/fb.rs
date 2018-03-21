@@ -159,7 +159,7 @@ impl Font {
             self.headersize
         };
 
-        let addr = (self as *const Self as *const u8);
+        let addr = self as *const Self as *const u8;
         unsafe {
             from_raw_parts(addr.offset(offset as isize), self.bytesperglyph as usize)
         }

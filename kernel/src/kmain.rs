@@ -4,7 +4,6 @@
 #![feature(asm)]
 #![feature(optin_builtin_traits)]
 #![feature(decl_macro)]
-#![feature(repr_align)]
 #![feature(attr_literals)]
 #![feature(exclusive_range_pattern)]
 #![feature(i128_type)]
@@ -69,14 +68,9 @@ use fs::FileSystem;
 use process::GlobalScheduler;
 
 #[global_allocator]
-#[cfg(not(test))]
-pub static mut ALLOCATOR: Allocator = allocator::Allocator::uninitialized();
-
-#[cfg(not(test))]
-pub static FILE_SYSTEM: FileSystem = FileSystem::uninitialized();
-#[cfg(not(test))]
-pub static SCHEDULER: GlobalScheduler = GlobalScheduler::uninitialized();
-
+#[cfg(not(test))] pub static mut ALLOCATOR: Allocator = allocator::Allocator::uninitialized();
+#[cfg(not(test))] pub static FILE_SYSTEM: FileSystem = FileSystem::uninitialized();
+#[cfg(not(test))] pub static SCHEDULER: GlobalScheduler = GlobalScheduler::uninitialized();
 
 const BINARY_START_ADDR: usize = 0x8_0000; // 512kb
 const KERNEL_SPACE: usize = 0xFFFFFF80_00000000;
@@ -97,27 +91,21 @@ const ADDR_2GB: usize   = 0x8000_0000;
 
 extern "C" {
     fn xsvc(a: u64, b: u64, c: u64, d: u64, ) -> u64;
-    fn context_restore();
-    static _stack_core0_el0: *mut usize;
-    static _stack_core0_el1: *mut usize;
 }
 
 #[no_mangle]
 #[cfg(not(test))]
 pub extern "C" fn el0_main() -> ! {
     kprintln!("im in a bear suite");
-    kprintln!("fuck you shit: {}", 555);
     unsafe { asm!("brk 1" :::: "volatile"); }
-    /*
-        kprintln!("fuck you shit: {}", 555);
+    kprintln!("fuck you shit: {}", 555);
     unsafe { asm!("brk 2" :::: "volatile"); }
-        kprintln!("im in a bear suite");
-        */
+
     for _ in 0..4 {
         let v = unsafe { xsvc(111, 222, 333, 444) };
         kprintln!("fuck you shit: {}", v);
         kprintln!("im in a bear suite");
-        unsafe { asm!("brk 1" :::: "volatile"); }
+        unsafe { asm!("brk 3" :::: "volatile"); }
     }
 
     shell::shell("user0> ")
@@ -158,13 +146,6 @@ pub extern "C" fn kernel_main() -> ! {
     kprintln!("fs");
     FILE_SYSTEM.initialize();
 
-    if true {
-        use pi::interrupt::{Controller, Interrupt};
-        kprintln!("timer");
-
-        Controller::new().enable(Interrupt::Timer1);
-        pi::timer::tick_in(process::TICK);
-    }
 
     test_timers();
 
@@ -175,6 +156,13 @@ pub extern "C" fn kernel_main() -> ! {
     //shell::shell("kernel> ");
 
     kprintln!("EL0:");
+
+    use pi::interrupt::{Controller, Interrupt};
+    use pi::timer::tick_in;
+
+    Controller::new().enable(Interrupt::Timer1);
+    tick_in(process::TICK);
+
     SCHEDULER.start()
 }
 

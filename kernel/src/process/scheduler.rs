@@ -1,8 +1,11 @@
-use std::collections::VecDeque;
+use alloc::VecDeque;
+use core::nonzero::NonZero;
+use core::mem;
 
 use mutex::Mutex;
 use process::{Process, State, Id};
 use traps::TrapFrame;
+use aarch64::wait_for_interrupt;
 
 /// The `tick` time.
 // FIXME: When you're ready, change this to something more reasonable.
@@ -43,13 +46,12 @@ impl GlobalScheduler {
     pub fn start(&self) -> ! {
         let mut process = Process::new().unwrap();
         process.trap_frame.elr = (el0_main as *const ()) as u64;
-        process.trap_frame.sp = process.stack.top().as_u64();
 
-        let trap_frame = {
-            let p = &*process.trap_frame;
-            let frame = p as *const TrapFrame as u64;
-            ::core::mem::forget(p);
-            frame
+        let tf = {
+            let p = (&*process.trap_frame);
+            let tf = p as *const TrapFrame as u64;
+            mem::forget(p);
+            tf
         };
 
         *self.0.lock() = Some(Scheduler::new());
@@ -57,17 +59,15 @@ impl GlobalScheduler {
 
         unsafe {
             asm!("
-            mov x0, $0
-            mov SP, x0
+            mov SP, $0
             bl  context_restore
-
             ldr x0, =_stack_core0_el1
             mov SP, x0
             mov x0, #0
             mov x30, #0
             eret
             "
-            :: "r"(trap_frame)
+            :: "r"(tf)
             :: "volatile");
         }
         unreachable!("goto EL0")
@@ -100,15 +100,22 @@ impl Scheduler {
     /// It is the caller's responsibility to ensure that the first time `switch`
     /// is called, that process is executing on the CPU.
     fn add(&mut self, mut process: Process) -> Option<Id> {
-        self.last_id = if self.last_id.is_none() {
-            process.trap_frame.tpidr = 1;
-            self.current = process.id();
-            self.processes.push_back(process);
-            process.id()
-        } else {
-            unimplemented!("Scheduler::add")
+         let id = match self.last_id {
+            Some(id) => {
+                let id = id.get().checked_add(1)?;
+                unsafe { NonZero::new_unchecked(id) }
+            }
+            None => {
+                let id = unsafe { NonZero::new_unchecked(1) };
+                self.current = Some(id);
+                id
+            }
         };
 
+        process.trap_frame.tpidr = id.get();
+        self.processes.push_back(process);
+
+        self.last_id = Some(id);
         self.last_id
     }
 
@@ -121,18 +128,26 @@ impl Scheduler {
     /// This method blocks until there is a process to switch to, conserving
     /// energy as much as possible in the interim.
     fn switch(&mut self, new_state: State, tf: &mut TrapFrame) -> Option<Id> {
-        /*
-        let current = self.processes.pop_front();
-        match current {
-            Some(process) => {
-                process.state = new_state;
-                *process.trap_frame = *tf;
+        let mut last = self.processes.pop_front()?;
+        *last.trap_frame = *tf;
+        last.state = new_state;
+        self.processes.push_back(last);
 
-                self.processes.push_back(process);
+        /*
+        loop {
+            let mut current = self.processes.pop_front()?;
+            if current.is_ready() {
+                *tf = *current.trap_frame;
+                current.state = State::Running;
+                self.current = current.id();
+                self.processes.push_front(current);
+                break self.current;
             }
-            None => None,
+            self.processes.push_back(current);
+            wait_for_interrupt();
         }
         */
-        unimplemented!("Scheduler::switch")
+
+        self.current
     }
 }

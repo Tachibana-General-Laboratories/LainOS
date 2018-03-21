@@ -26,7 +26,8 @@ impl Process {
     pub fn new() -> Option<Self> {
         Stack::new().map(|stack| {
             let state = State::Ready;
-            let mut trap_frame = Box::new(unsafe { mem::zeroed() });
+            let mut trap_frame: Box<TrapFrame> = Box::new(unsafe { mem::zeroed() });
+            trap_frame.sp = stack.top().as_u64();
             Self { trap_frame, stack, state }
         })
     }

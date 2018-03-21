@@ -158,11 +158,11 @@ go_main:
     mov     x0, \source
     movk    x0, \kind, LSL #16
     bl      context_save
-    enable_interrupts
+    //enable_interrupts
     mrs     x1, ESR_EL1
     mov     x2, SP
     bl      \call
-    disable_interrupts
+    //disable_interrupts
     bl      context_restore
     ldp     x30, x0, [SP], #16
     eret
