@@ -184,13 +184,18 @@ mod uart_io {
     // read times out, an error of kind `TimedOut` should be returned.
     impl io::Read for MiniUart {
         fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+            if self.wait_for_byte().is_err() {
+                return Err(io::Error::new(io::ErrorKind::TimedOut, "uart time out"));
+            }
+            let mut count = 0;
             for b in buf.iter_mut() {
-                if self.wait_for_byte().is_err() {
-                    return Err(io::Error::new(io::ErrorKind::TimedOut, "uart time out"));
+                if !self.has_byte() {
+                    break;
                 }
                 *b = self.read_byte();
+                count += 1;
             }
-            Ok(buf.len())
+            Ok(count)
         }
     }
 

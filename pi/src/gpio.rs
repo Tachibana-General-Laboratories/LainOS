@@ -17,6 +17,22 @@ pub enum Function {
     Alt5 = 0b010
 }
 
+pub enum Event {
+    RisingEdge,
+    FallingEdge,
+    HighLevel,
+    LowLevel,
+    AsyncRisingEdge,
+    AsyncFallingEdge,
+}
+
+#[repr(u32)]
+pub enum Pud {
+    Off = 0b00,
+    Down = 0b01,
+    Up = 0b10,
+}
+
 #[repr(C)]
 #[allow(non_snake_case)]
 struct Registers {
@@ -78,6 +94,79 @@ impl<T> Gpio<T> {
             registers: self.registers,
             _state: PhantomData
         }
+    }
+
+    pub fn set_pud(&mut self, pud: Pud) {
+        let index = (self.pin / 32) as usize;
+        let shift = (self.pin % 32) as u32;
+        self.registers.PUD.write(pud as u32);
+        spin_sleep_cycles(150);
+        self.registers.PUDCLK[index].and_mask(1 << shift);
+        spin_sleep_cycles(150);
+        self.registers.PUD.write(0);
+        self.registers.PUDCLK[index].write(0);
+    }
+
+    pub fn set_event_detection(&mut self, event: Event) {
+        let index = (self.pin / 32) as usize;
+        let mask = 1 << (self.pin % 32) as u32;
+        match event {
+            Event::RisingEdge => self.registers.REN[index].or_mask(mask),
+            Event::FallingEdge => self.registers.FEN[index].or_mask(mask),
+            Event::HighLevel => self.registers.HEN[index].or_mask(mask),
+            Event::LowLevel => self.registers.LEN[index].or_mask(mask),
+            Event::AsyncRisingEdge => self.registers.AREN[index].or_mask(mask),
+            Event::AsyncFallingEdge => self.registers.AFEN[index].or_mask(mask),
+        }
+        self.clear_event();
+    }
+
+    pub fn clear_event_detection(&mut self, event: Event) {
+        let index = (self.pin / 32) as usize;
+        let mask = !(1 << (self.pin % 32) as u32);
+        match event {
+            Event::RisingEdge => self.registers.REN[index].and_mask(mask),
+            Event::FallingEdge => self.registers.FEN[index].and_mask(mask),
+            Event::HighLevel => self.registers.HEN[index].and_mask(mask),
+            Event::LowLevel => self.registers.LEN[index].and_mask(mask),
+            Event::AsyncRisingEdge => self.registers.AREN[index].and_mask(mask),
+            Event::AsyncFallingEdge => self.registers.AFEN[index].and_mask(mask),
+        }
+        self.clear_event();
+    }
+
+    pub fn get_event_detection(&mut self, event: Event) -> bool {
+        let index = (self.pin / 32) as usize;
+        let mask = 1 << (self.pin % 32) as u32;
+        let val = match event {
+            Event::RisingEdge => self.registers.REN[index].read(),
+            Event::FallingEdge => self.registers.FEN[index].read(),
+            Event::HighLevel => self.registers.HEN[index].read(),
+            Event::LowLevel => self.registers.LEN[index].read(),
+            Event::AsyncRisingEdge => self.registers.AREN[index].read(),
+            Event::AsyncFallingEdge => self.registers.AFEN[index].read(),
+        };
+        (val & mask) != 0
+    }
+
+    pub fn check_event(&mut self) -> bool {
+        let index = (self.pin / 32) as usize;
+        let shift = (self.pin % 32) as u32;
+        (self.registers.EDS[index].read() & (1 << shift)) != 0
+    }
+    pub fn clear_event(&mut self) {
+        let index = (self.pin / 32) as usize;
+        let shift = (self.pin % 32) as u32;
+        if self.check_event() {
+            self.registers.EDS[index].write(1 << shift);
+        }
+    }
+    pub fn check_and_clear_event(&mut self) -> bool {
+        let event = self.check_event();
+        if event {
+            self.clear_event();
+        }
+        event
     }
 }
 
@@ -147,23 +236,8 @@ impl Gpio<Input> {
     }
 }
 
-#[repr(u32)]
-pub enum Pull {
-    Off = 0b00,
-    Down = 0b01,
-    Up = 0b10,
-}
-
 impl Gpio<Alt> {
-    pub fn pull(&mut self, value: Pull) {
-        let index = (self.pin / 32) as usize;
-        let shift = (self.pin % 32) as u32;
-
-        self.registers.PUD.write(value as u32);
-        spin_sleep_cycles(150);
-        self.registers.PUDCLK[index].and_mask(1 << shift);
-        spin_sleep_cycles(150);
-        self.registers.PUD.write(0);
-        self.registers.PUDCLK[index].and_mask(0);
+    pub fn pull(&mut self, value: Pud) {
+        self.set_pud(value);
     }
 }
