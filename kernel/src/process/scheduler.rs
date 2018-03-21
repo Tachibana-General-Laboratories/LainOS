@@ -107,6 +107,7 @@ impl Scheduler {
             }
             None => {
                 let id = unsafe { NonZero::new_unchecked(1) };
+                process.state = State::Running;
                 self.current = Some(id);
                 id
             }
@@ -128,26 +129,31 @@ impl Scheduler {
     /// This method blocks until there is a process to switch to, conserving
     /// energy as much as possible in the interim.
     fn switch(&mut self, new_state: State, tf: &mut TrapFrame) -> Option<Id> {
-        let mut last = self.processes.pop_front()?;
-        *last.trap_frame = *tf;
-        last.state = new_state;
-        self.processes.push_back(last);
-
-        /*
-        loop {
-            let mut current = self.processes.pop_front()?;
-            if current.is_ready() {
-                *tf = *current.trap_frame;
-                current.state = State::Running;
-                self.current = current.id();
-                self.processes.push_front(current);
-                break self.current;
+        if let Some(mut process) = self.processes.pop_front() {
+            if process.id() == self.current {
+                *process.trap_frame = *tf;
+                process.state = new_state;
+                self.current = None;
             }
-            self.processes.push_back(current);
+            self.processes.push_back(process);
+        }
+
+        loop {
+            for _ in 0..self.processes.len() {
+                let mut process = self.processes.pop_front().unwrap();
+
+                if !process.is_ready() {
+                    self.processes.push_back(process);
+                    continue;
+                }
+
+                *tf = *process.trap_frame;
+                self.current = process.id();
+                self.processes.push_front(process);
+                return self.current;
+            }
             wait_for_interrupt();
         }
-        */
-
-        self.current
+        None
     }
 }

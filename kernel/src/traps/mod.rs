@@ -6,6 +6,7 @@ mod syscall;
 use pi::interrupt::{Controller, Interrupt};
 
 pub use self::trap_frame::TrapFrame;
+pub use self::syscall::Error;
 
 use console::kprintln;
 use self::syndrome::Syndrome;

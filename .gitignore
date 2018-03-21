@@ -1,6 +1,7 @@
 /build/
 /target/
 /*/target/
+/*/build/
 /files/
 /qemu/
 Cargo.lock

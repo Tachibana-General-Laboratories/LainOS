@@ -37,13 +37,19 @@ VPATH = ext
 all: $(KERNEL).img
 	cp -f $(KERNEL).img ../kernel8.img
 
+pi:
+	screen /dev/ttyUSB0 115200
+
 qemu: all
-	qemu-system-$(arch) -M raspi3 \
+	sudo qemu-system-$(arch) -M raspi3 \
 		-m 1024 \
+		-smp 4 \
+		-accel tcg,thread=multi \
 		-display sdl,gl=on -sdl \
-		-drive file=fs.img,if=sd,format=raw \
+		-drive file=../fs.img,if=sd,format=raw \
+		-serial /dev/tty5 \
 		-serial stdio \
-		-kernel $(KERNEL).img
+		-kernel $(KERNEL).elf
 
 qemu2: all
 	sudo qemu-system-$(arch) -M raspi3 \

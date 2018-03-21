@@ -95,5 +95,5 @@ fn memory_map() -> Option<(usize, usize)> {
     let binary_end = unsafe { (&_end as *const u8) as u32 };
 
     //unimplemented!("memory map fetch")
-    Some((0x0200_0000, 0x0400_0000))
+    Some((binary_end, 0x2000_0000 - binary_end))
 }

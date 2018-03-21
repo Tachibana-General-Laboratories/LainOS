@@ -93,23 +93,96 @@ extern "C" {
     fn xsvc(a: u64, b: u64, c: u64, d: u64, ) -> u64;
 }
 
+/// Like `println!`, but for kernel-space.
+pub macro uprintln {
+    () => (uprint!("\n")),
+    ($fmt:expr) => (uprint!(concat!($fmt, "\n"))),
+    ($fmt:expr, $($arg:tt)*) => (uprint!(concat!($fmt, "\n"), $($arg)*))
+}
+
+/// Like `print!`, but for kernel-space.
+pub macro uprint($($arg:tt)*) {
+    syscall_print(&format!($($arg)*))
+}
+
 #[no_mangle]
 #[cfg(not(test))]
 pub extern "C" fn el0_main() -> ! {
-    kprintln!("im in a bear suite");
+    uprintln!("im in a bear suite").unwrap();
     unsafe { asm!("brk 1" :::: "volatile"); }
-    kprintln!("fuck you shit: {}", 555);
+    uprintln!("fuck you shit: {}", 555).unwrap();
     unsafe { asm!("brk 2" :::: "volatile"); }
 
     for _ in 0..4 {
         let v = unsafe { xsvc(111, 222, 333, 444) };
-        kprintln!("fuck you shit: {}", v);
-        kprintln!("im in a bear suite");
+        uprintln!("fuck you shit: {}", v).unwrap();
+        uprintln!("im in a bear suite").unwrap();
         unsafe { asm!("brk 3" :::: "volatile"); }
     }
 
+    let mut motor = pi::gpio::Gpio::new(20).into_output();
+    let mut button = pi::gpio::Gpio::new(18).into_input();
+    button.set_pud(pi::gpio::Pud::Up);
+
+    loop {
+        uprintln!("loop 100_0000").unwrap();
+        pi::common::spin_sleep_cycles(100_0000);
+        //syscall_sleep(1000 * 3);
+
+        motor.set();
+        pi::timer::spin_sleep_ms(50);
+        motor.clear();
+        //pi::timer::spin_sleep_ms(200);
+    }
+
+    uprintln!("test sleep").unwrap();
+    uprintln!("test sleep: OK").unwrap();
+
     shell::shell("user0> ")
 }
+
+use traps::Error as SysErr;
+
+fn syscall_print(s: &str) -> Result<(), SysErr> {
+    let error: u64;
+    unsafe {
+        asm!("mov x0, $1
+              mov x1, $2
+              svc 2
+              mov $0, x7
+              "
+              : "=r"(error)
+              : "r"(s.as_ptr()), "r"(s.len())
+              : "x0", "x1", "x7"
+              : "volatile")
+    }
+    if error == 0 {
+        Ok(())
+    } else {
+        Err(SysErr::from(error))
+    }
+}
+
+fn syscall_sleep(ms: u32) -> Result<(), SysErr> {
+    let error: u64;
+    unsafe {
+        asm!("mov x0, $0
+              svc 1
+              mov $0, x7
+              "
+              : "=r"(error)
+              : "r"(ms)
+              : "x0", "x7"
+              : "volatile");
+    }
+    if error == 0 {
+        Ok(())
+    } else {
+        Err(SysErr::from(error))
+    }
+}
+
+
 
 #[no_mangle]
 #[cfg(not(test))]
