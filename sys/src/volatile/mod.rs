@@ -1,13 +1,8 @@
-#![feature(decl_macro)]
-#![feature(optin_builtin_traits)]
-
-#![no_std]
-
 mod traits;
 mod macros;
 
-pub use traits::*;
-use macros::*;
+pub use self::traits::*;
+use self::macros::*;
 
 /// Reexports all of the traits in this crate.
 ///

@@ -1,8 +1,8 @@
 use core::marker::PhantomData;
 
 use common::{IO_BASE, states, spin_sleep_cycles};
-use volatile::prelude::*;
-use volatile::{Volatile, WriteVolatile, ReadVolatile, Reserved};
+use sys::volatile::prelude::*;
+use sys::volatile::{Volatile, WriteVolatile, ReadVolatile, Reserved};
 
 /// An alternative GPIO function.
 #[repr(u8)]

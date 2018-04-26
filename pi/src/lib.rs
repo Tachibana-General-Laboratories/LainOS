@@ -11,7 +11,7 @@
 
 #[cfg(feature = "std")]
 extern crate core;
-extern crate volatile;
+extern crate sys;
 
 pub mod timer;
 pub mod uart;

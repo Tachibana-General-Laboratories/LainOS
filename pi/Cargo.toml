@@ -4,7 +4,7 @@ version = "0.1.0"
 authors = ["Sergio Benitez <sb@sergio.bz>"]
 
 [dependencies]
-volatile = { path = "../volatile" }
+sys = { path = "../sys" }
 
 [features]
 std = []

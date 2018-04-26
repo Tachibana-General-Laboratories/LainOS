@@ -25,8 +25,7 @@ extern crate alloc;
 extern crate slab_allocator;
 //extern crate spin;
 
-extern crate stack_vec;
-extern crate volatile;
+extern crate sys;
 extern crate pi;
 extern crate sys_fs as fat32;
 
@@ -47,7 +46,7 @@ pub mod mutex;
 pub mod console;
 
 #[cfg(not(test))] pub mod panic;
-#[cfg(not(test))] pub mod mmu;
+//#[cfg(not(test))] pub mod mmu;
 
 #[cfg(not(test))] pub mod fb;
 #[cfg(not(test))] pub mod shell;

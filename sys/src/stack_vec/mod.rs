@@ -1,8 +1,5 @@
-#![cfg_attr(test, feature(inclusive_range_syntax))]
-#![no_std]
-
 #[cfg(test)]
-mod tests;
+mod stack_vec_tests;
 
 use core::ops::{Deref, DerefMut};
 use core::slice;

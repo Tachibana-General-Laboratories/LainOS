@@ -1,6 +1,6 @@
 use common::IO_BASE;
-use volatile::prelude::*;
-use volatile::{Volatile, ReadVolatile};
+use sys::volatile::prelude::*;
+use sys::volatile::{Volatile, ReadVolatile};
 
 const INT_BASE: usize = IO_BASE + 0xB000 + 0x200;
 

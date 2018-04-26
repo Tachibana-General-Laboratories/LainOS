@@ -8,10 +8,7 @@ slab_allocator = "0.3.0"
 bitflags = "1"
 
 sys_fs = { path = "../sys_fs" }
-stack-vec = { path = "../stack-vec" }
-volatile = { path = "../volatile" }
-
-#std = { path = "std" }
+sys = { path = "../sys" }
 pi = { path = "../pi", features = ["std"] }
 
 log = { version = "0.4", features = ["max_level_trace", "release_max_level_warn"] }

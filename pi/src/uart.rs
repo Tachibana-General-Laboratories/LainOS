@@ -1,7 +1,7 @@
 use core::fmt;
 
-use volatile::prelude::*;
-use volatile::{Volatile, ReadVolatile, Reserved};
+use sys::volatile::prelude::*;
+use sys::volatile::{Volatile, ReadVolatile, Reserved};
 
 use timer;
 use common::IO_BASE;

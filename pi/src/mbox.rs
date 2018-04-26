@@ -1,7 +1,7 @@
 use common::{IO_BASE, spin_wait};
 
-use volatile::prelude::*;
-use volatile::{Volatile, ReadVolatile, Reserved};
+use sys::volatile::prelude::*;
+use sys::volatile::{Volatile, ReadVolatile, Reserved};
 
 /// enumerated mailbox channels
 /// see https://github.com/raspberrypi/firmware/wiki/Mailboxes
