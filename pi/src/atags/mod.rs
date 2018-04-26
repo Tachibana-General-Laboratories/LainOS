@@ -13,10 +13,9 @@ pub struct Atags {
 
 impl Atags {
     /// Returns an instance of `Atags`, an iterator over ATAGS on this system.
-    pub fn get() -> Atags {
-        Atags {
-            ptr: unsafe { &*(ATAG_BASE as *const raw::Atag) }
-        }
+    pub fn get() -> Self {
+        let ptr = unsafe { &*(ATAG_BASE as *const raw::Atag) };
+        Self { ptr }
     }
 }
 
@@ -24,6 +23,8 @@ impl Iterator for Atags {
     type Item = Atag;
 
     fn next(&mut self) -> Option<Atag> {
-        unimplemented!("atags iterator")
+        let atag = self.ptr.next()?;
+        self.ptr = unsafe { &*(atag as *const raw::Atag) };
+        Some(Atag::from(atag))
     }
 }
