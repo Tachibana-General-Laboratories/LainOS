@@ -1,6 +1,6 @@
 use pi::mbox;
-use std::mem::transmute;
-use std::slice::from_raw_parts;
+use core::mem::transmute;
+use core::slice::from_raw_parts;
 
 struct Info {
     width: u32,         // width of the display

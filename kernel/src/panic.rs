@@ -1,6 +1,6 @@
 use console::{kprint, kprintln};
 
-use std::fmt;
+use core::fmt;
 
 #[lang = "eh_personality"]
 pub extern "C" fn eh_personality() {}

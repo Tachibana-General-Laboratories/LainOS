@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 
-use std::{fmt, ptr};
+use core::{fmt, ptr};
 
 /// An _instrusive_ linked list of addresses.
 ///

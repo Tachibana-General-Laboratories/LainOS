@@ -1,5 +1,5 @@
 use std::io;
-use std::fmt;
+use core::fmt;
 
 use pi::uart::MiniUart;
 use mutex::Mutex;

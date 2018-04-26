@@ -4,14 +4,17 @@ mod util;
 #[path = "bump.rs"]
 mod imp;
 
-use slab_allocator::Heap;
+use slab_allocator::{Heap, MIN_HEAP_SIZE};
 
 #[cfg(test)]
 mod tests;
 
 use mutex::Mutex;
 use alloc::heap::{Alloc, AllocErr, Layout};
-use std::cmp::max;
+use core::cmp::max;
+
+use console::kprintln;
+use pi::atags::Atags;
 
 /// Thread-safe (locking) wrapper around a particular memory allocator.
 //#[derive(Debug)]
@@ -93,7 +96,14 @@ extern "C" {
 /// This function is expected to return `Some` under all normal cirumstances.
 fn memory_map() -> Option<(usize, usize)> {
     let binary_end = unsafe { (&_end as *const u8) as u32 };
+    let start = util::align_up(binary_end as usize, MIN_HEAP_SIZE);
 
-    //unimplemented!("memory map fetch")
-    Some((binary_end, 0x2000_0000 - binary_end))
+    let end = Atags::get()
+        .inspect(|t| kprintln!("found atag: {:?}", t))
+        .filter_map(|t| t.mem())
+        .map(|t| (t.start + t.size) as usize)
+        .max()
+        .unwrap_or(0x4000_0000);
+    kprintln!("end of mem: 0x{:x}", end);
+    Some((start, end))
 }

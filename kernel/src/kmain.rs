@@ -120,18 +120,23 @@ pub extern "C" fn el0_main() -> ! {
         unsafe { asm!("brk 3" :::: "volatile"); }
     }
 
+    let mut led = pi::gpio::Gpio::new(16).into_output();
     let mut motor = pi::gpio::Gpio::new(20).into_output();
     let mut button = pi::gpio::Gpio::new(18).into_input();
-    button.set_pud(pi::gpio::Pud::Up);
 
     loop {
+        let down = !button.level();
         uprintln!("loop 100_0000").unwrap();
         pi::common::spin_sleep_cycles(100_0000);
         //syscall_sleep(1000 * 3);
 
-        motor.set();
-        pi::timer::spin_sleep_ms(50);
-        motor.clear();
+        if down {
+            motor.set();
+            led.set();
+            pi::timer::spin_sleep_ms(50);
+            motor.clear();
+            led.clear();
+        }
         //pi::timer::spin_sleep_ms(200);
     }
 
@@ -183,7 +188,6 @@ fn syscall_sleep(ms: u32) -> Result<(), SysErr> {
 }
 
 
-
 #[no_mangle]
 #[cfg(not(test))]
 pub extern "C" fn kernel_main() -> ! {
@@ -200,6 +204,10 @@ pub extern "C" fn kernel_main() -> ! {
     let el = unsafe { aarch64::current_el() };
     let cpuid = unsafe { aarch64::affinity() };
     kprintln!("start kernel main at [CPU{} EL{}]", cpuid, el);
+
+    for atag in pi::atags::Atags::get() {
+        kprintln!("Atag: {:?}", atag);
+    }
 
     /*
     init_logger().unwrap();

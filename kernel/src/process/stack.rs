@@ -1,5 +1,5 @@
-use std::fmt;
-use std::ptr::Unique;
+use core::fmt;
+use core::ptr::Unique;
 
 use ALLOCATOR;
 use alloc::allocator::{Alloc, Layout};

@@ -1,6 +1,6 @@
 use pi::*;
 use pi::common::IO_BASE;
-use std::slice;
+use core::slice;
 use volatile::prelude::*;
 use volatile::Volatile;
 

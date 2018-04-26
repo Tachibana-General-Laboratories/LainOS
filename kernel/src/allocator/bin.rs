@@ -1,4 +1,4 @@
-use std::fmt;
+use core::fmt;
 use alloc::heap::{AllocErr, Layout};
 
 use allocator::util::*;
