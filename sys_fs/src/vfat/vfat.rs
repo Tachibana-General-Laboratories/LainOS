@@ -7,7 +7,7 @@ use util::SliceExt;
 use mbr::MasterBootRecord;
 use vfat::{Shared, Cluster, File, Dir, Entry, FatEntry, Error, Status};
 use vfat::{BiosParameterBlock, CachedDevice, Partition};
-use traits::{FileSystem, BlockDevice};
+use sys::fs::{FileSystem, BlockDevice};
 
 #[derive(Debug)]
 pub struct VFat {

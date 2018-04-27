@@ -60,7 +60,7 @@ impl MiniUart {
     ///
     /// By default, reads will never time out. To set a read timeout, use
     /// `set_read_timeout()`.
-    pub fn new() -> MiniUart {
+    pub fn new() -> Self {
         let registers = unsafe {
             // Enable the mini UART as an auxiliary device.
             (*AUX_ENABLES).or_mask(1);
@@ -80,9 +80,7 @@ impl MiniUart {
         // enable Tx, Rx
         registers.CNTL.write(0b11);
 
-        Self {
-            registers, timeout: None,
-        }
+        Self { registers, timeout: None }
     }
 
     /// Set the read timeout to `milliseconds` milliseconds.

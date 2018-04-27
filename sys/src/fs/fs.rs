@@ -1,7 +1,7 @@
 use std::io;
 use std::path::Path;
 
-use traits::Metadata;
+use fs::Metadata;
 
 /// Trait implemented by files in the file system.
 pub trait File: io::Read + io::Write + io::Seek + Sized {
@@ -11,6 +11,23 @@ pub trait File: io::Read + io::Write + io::Seek + Sized {
     /// Returns the size of the file in bytes.
     fn size(&self) -> u64;
 }
+
+/*
+pub enum SeekFrom {
+    Start(u64),
+    End(i64),
+    Current(i64),
+}
+pub trait XFile: Sized {
+    fn sync(&mut self) -> io::Result<()>;
+    fn size(&self) -> u64;
+
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize>;
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize>;
+    fn flush(&mut self) -> io::Result<()>;
+    fn seek(&mut self, pos: SeekFrom) -> io::Result<u64>;
+}
+*/
 
 /// Trait implemented by directories in a file system.
 pub trait Dir: Sized {

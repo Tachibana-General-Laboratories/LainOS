@@ -6,7 +6,7 @@ use rand;
 
 use vfat::{Shared, VFat, BiosParameterBlock};
 use mbr::{MasterBootRecord, CHS, PartitionEntry};
-use traits::*;
+use sys::fs::*;
 
 macro check_size($T:ty, $size:expr) {
     assert_eq!(::std::mem::size_of::<$T>(), $size,

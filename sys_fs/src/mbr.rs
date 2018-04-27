@@ -1,6 +1,6 @@
 use std::{fmt, io};
 
-use traits::BlockDevice;
+use sys::fs::BlockDevice;
 
 #[repr(C, packed)]
 #[derive(Copy, Clone, Debug)]

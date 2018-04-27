@@ -1,6 +1,6 @@
 use std::fmt;
 
-use traits;
+use sys;
 
 /// A date as represented in FAT32 on-disk structures.
 #[repr(C, packed)]
@@ -57,7 +57,7 @@ pub struct Metadata {
     pub modified: Timestamp,
 }
 
-impl traits::Timestamp for Timestamp {
+impl sys::fs::Timestamp for Timestamp {
     fn year(&self) -> usize {
         1980 + (self.date.0 >> 9) as usize
     }
@@ -78,7 +78,7 @@ impl traits::Timestamp for Timestamp {
     }
 }
 
-impl traits::Metadata for Metadata {
+impl sys::fs::Metadata for Metadata {
     type Timestamp = Timestamp;
 
     fn read_only(&self) -> bool {
@@ -100,7 +100,7 @@ impl traits::Metadata for Metadata {
 
 impl fmt::Display for Timestamp {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        use traits::Timestamp;
+        use sys::fs::Timestamp;
         write!(f, "{}-{}-{} {}:{}:{}",
             self.year(), self.month(), self.day(),
             self.hour(), self.minute(), self.second(),
@@ -110,7 +110,7 @@ impl fmt::Display for Timestamp {
 
 impl fmt::Display for Metadata {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        use traits::Metadata;
+        use sys::fs::Metadata;
         writeln!(f, "ro: {}, hid: {}", self.read_only(), self.hidden())?;
         writeln!(f, "Access: {}", self.accessed())?;
         writeln!(f, "Modify: {}", self.modified())?;

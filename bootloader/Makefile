@@ -1,5 +1,6 @@
 TARGET ?= aarch64-elf
 CROSS ?= $(TARGET)
+BUILD_DIR ?= build
 
 CC := $(CROSS)-gcc
 CCFLAGS ?= -Wall -O2 -nostdlib -nostartfiles -ffreestanding -pie -fpie
@@ -17,7 +18,6 @@ RUST_RELEASE_LIB := $(RUST_BUILD_DIR)/release/lib$(RUST_BINARY).a
 RUST_DEPS = Xargo.toml Cargo.toml build.rs $(LD_LAYOUT) src/*
 EXT_DEPS = $(BUILD_DIR)/init.o
 
-BUILD_DIR := build
 KERNEL := $(BUILD_DIR)/$(RUST_BINARY)
 RUST_LIB := $(BUILD_DIR)/$(RUST_BINARY).a
 

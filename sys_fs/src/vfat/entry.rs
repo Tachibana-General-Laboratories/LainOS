@@ -1,4 +1,4 @@
-use traits;
+use sys;
 use vfat::{File, Dir, Metadata, Cluster};
 
 // TODO: You may need to change this definition.
@@ -25,7 +25,7 @@ impl Entry {
     }
 }
 
-impl traits::Entry for Entry {
+impl sys::fs::Entry for Entry {
     type File = File;
     type Dir = Dir;
     type Metadata = Metadata;

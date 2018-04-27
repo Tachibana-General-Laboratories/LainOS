@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use std::collections::hash_map::Entry;
 use fnv::*;
 
-use traits::BlockDevice;
+use sys::fs::BlockDevice;
 
 pub struct Partition {
     /// The physical sector where the partition begins.

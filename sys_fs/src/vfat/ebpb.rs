@@ -1,6 +1,6 @@
 use std::fmt;
 
-use traits::BlockDevice;
+use sys::fs::BlockDevice;
 use vfat::Error;
 
 #[repr(C, packed)]

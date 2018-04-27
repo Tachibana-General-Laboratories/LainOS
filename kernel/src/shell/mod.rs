@@ -9,7 +9,7 @@ use std::io;
 use std::path::{Path, PathBuf};
 
 use FILE_SYSTEM;
-use fat32::traits::*;
+use sys::fs::*;
 
 /// Error type for `Command` parse failures.
 #[derive(Debug)]

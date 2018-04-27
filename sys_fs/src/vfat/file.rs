@@ -1,7 +1,7 @@
 use std::cmp::{min, max};
 use std::io::{self, SeekFrom};
 
-use traits;
+use sys;
 use vfat::{VFat, Shared, Cluster, Metadata};
 
 #[derive(Debug)]
@@ -75,7 +75,7 @@ impl io::Write for File {
     }
 }
 
-impl traits::File for File {
+impl sys::fs::File for File {
     fn sync(&mut self) -> io::Result<()> {
         unimplemented!()
     }

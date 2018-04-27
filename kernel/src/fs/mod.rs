@@ -4,7 +4,7 @@ use std::io;
 use std::path::Path;
 
 use fat32::vfat::{self, Shared, VFat};
-pub use fat32::traits;
+pub use sys::fs;
 
 use mutex::Mutex;
 use self::sd::Sd;
@@ -32,7 +32,7 @@ impl FileSystem {
     }
 }
 
-impl<'a> traits::FileSystem for &'a FileSystem {
+impl<'a> fs::FileSystem for &'a FileSystem {
     type File = vfat::File;
     type Dir = vfat::Dir;
     type Entry = vfat::Entry;

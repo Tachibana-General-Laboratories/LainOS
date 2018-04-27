@@ -83,6 +83,9 @@ $(RUST_DEBUG_LIB): $(RUST_DEPS)
 $(RUST_RELEASE_LIB): $(RUST_DEPS)
 	$(XARGO) build --verbose --release --target=$(TARGET)
 
+doc: $(RUST_DEPS)
+	$(XARGO) doc --verbose --release --target=$(TARGET)
+
 ifeq ($(DEBUG),1)
 $(RUST_LIB): $(RUST_DEBUG_LIB) | $(BUILD_DIR)
 	cp $< $@

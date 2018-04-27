@@ -119,9 +119,11 @@ pub extern "C" fn el0_main() -> ! {
         unsafe { asm!("brk 3" :::: "volatile"); }
     }
 
-    let mut led = pi::gpio::Gpio::new(16).into_output();
-    let mut motor = pi::gpio::Gpio::new(20).into_output();
-    let mut button = pi::gpio::Gpio::new(18).into_input();
+    use pi::gpio::Gpio;
+
+    let mut led = Gpio::new(16).into_output();
+    let mut motor = Gpio::new(20).into_output();
+    let mut button = Gpio::new(18).into_input();
 
     loop {
         let down = !button.level();

@@ -3,7 +3,7 @@ use std::char::decode_utf16;
 use std::borrow::Cow;
 use std::io;
 
-use traits;
+use sys;
 use util::VecExt;
 use vfat::{VFat, Shared, File, Cluster, Entry};
 use vfat::{Metadata, Attributes, Timestamp, Time, Date};
@@ -174,7 +174,7 @@ impl Dir {
     /// If `name` contains invalid UTF-8 characters, an error of `InvalidInput`
     /// is returned.
     pub fn find<P: AsRef<OsStr>>(&self, name: P) -> io::Result<Entry> {
-        use traits::*;
+        use sys::fs::*;
 
         if let Some(name) = name.as_ref().to_str() {
             let entry = self.entries()?
@@ -200,7 +200,7 @@ impl Dir {
     }
 }
 
-impl traits::Dir for Dir {
+impl sys::fs::Dir for Dir {
     type Entry = Entry;
     type Iter = DirIter;
 

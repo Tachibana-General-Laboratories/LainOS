@@ -2,19 +2,20 @@
 #![feature(alloc, allocator_api)]
 #![feature(global_allocator)]
 
+extern crate core;
 extern crate xmodem;
 extern crate pi;
 
 extern crate alloc;
 
-pub mod lang_items;
+#[global_allocator]
+static mut ALLOCATOR: Allocator = Allocator;
 
-use std::io::{self, Cursor};
-use std::slice::from_raw_parts_mut;
-use std::fmt::Write;
+use std::io;
+use core::slice::from_raw_parts_mut;
+use core::fmt::Write;
 use xmodem::Xmodem;
 use pi::uart::MiniUart;
-
 
 /// Start address of the binary to load and of the bootloader.
 const BINARY_START_ADDR: usize = 0x80000;
@@ -38,27 +39,34 @@ fn jump_to(addr: *mut u8) -> ! {
 pub extern "C" fn kmain() {
     let mut uart = MiniUart::new();
     uart.set_read_timeout(750);
-    uart.write_str("start bootloader\n");
+    uart.write_str("start bootloader\n").unwrap();
+    uart.write_str("go:\n").unwrap();
 
-    let mem: &mut [u8] = unsafe { from_raw_parts_mut(BINARY_START, MAX_BINARY_SIZE) };
-    let mut mem = Cursor::new(mem);
-
-    uart.write_str("go:\n");
     loop {
-        mem.set_position(0);
+        let mut mem: &mut [u8] = unsafe {
+            from_raw_parts_mut(BINARY_START, MAX_BINARY_SIZE)
+        };
         match Xmodem::receive(&mut uart, &mut mem) {
             Ok(_) => jump_to(BINARY_START),
             Err(err) => {
                 if err.kind() != io::ErrorKind::TimedOut {
-                    uart.write_fmt(format_args!("error: {:?}\n", err));
+                    let _ = uart.write_fmt(format_args!("error: {:?}\n", err));
                 }
             }
         }
     }
 }
 
-#[global_allocator]
-static mut ALLOCATOR: Allocator = Allocator;
+#[lang = "eh_personality"] pub extern fn eh_personality() {}
+
+#[lang = "panic_fmt"] #[no_mangle] pub extern fn panic_fmt(msg: ::std::fmt::Arguments, file: &'static str, line: u32, col: u32) -> ! {
+    use std::fmt::Write;
+    let mut uart = ::pi::uart::MiniUart::new();
+    let _ = uart.write_fmt(format_args!("PANIC {}:{} [{}]\n", file, line, col));
+    let _ = uart.write_fmt(msg);
+    let _ = uart.write_str("\n");
+    loop { }
+}
 
 static mut CURRENT: usize = 0x800_0000;
 
@@ -70,7 +78,7 @@ pub struct Allocator;
 unsafe impl<'a> Alloc for &'a Allocator {
     unsafe fn alloc(&mut self, layout: Layout) -> Result<*mut u8, AllocErr> {
         let start = align_up(CURRENT, layout.align());
-        unsafe { CURRENT = start + layout.size() };
+        CURRENT = start + layout.size();
         Ok(start as *mut u8)
     }
     unsafe fn dealloc(&mut self, _ptr: *mut u8, _layout: Layout) {

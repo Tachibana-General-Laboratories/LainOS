@@ -1,5 +1,5 @@
 use std::io;
-use fat32::traits::BlockDevice;
+use sys::fs::BlockDevice;
 
 use pi::common::spin_sleep_us;
 
