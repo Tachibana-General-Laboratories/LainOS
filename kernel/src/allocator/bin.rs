@@ -1,32 +1,28 @@
 use core::fmt;
-use alloc::heap::{AllocErr, Layout};
+use core::alloc::{AllocErr, Layout, Opaque};
+use core::ptr::NonNull;
 
 use allocator::util::*;
 use allocator::linked_list::LinkedList;
 
 /// A simple allocator that allocates based on size classes.
+#[derive(Debug)]
 pub struct Allocator {
-    // FIXME: Add the necessary fields.
-    bin8: LinkedList,
-    bin16: LinkedList,
-    bin32: LinkedList,
-    bin64: LinkedList,
-    bin128: LinkedList,
-    bin256: LinkedList,
-    bin512: LinkedList,
-    bin1024: LinkedList,
-    bin2048: LinkedList,
-    bin4096: LinkedList,
+    bin: [LinkedList; 16],
 
-    start: usize,
+    current: usize,
     end: usize,
 }
 
 impl Allocator {
     /// Creates a new bin allocator that will allocate memory from the region
     /// starting at address `start` and ending at address `end`.
-    pub fn new(start: usize, end: usize) -> Allocator {
-        unimplemented!("bin allocator")
+    pub fn new(start: usize, end: usize) -> Self {
+        Self {
+            bin: [LinkedList::new(); 16],
+            current: start,
+            end,
+        }
     }
 
     /// Allocates memory. Returns a pointer meeting the size and alignment
@@ -49,8 +45,29 @@ impl Allocator {
     /// Returning `Err` indicates that either memory is exhausted
     /// (`AllocError::Exhausted`) or `layout` does not meet this allocator's
     /// size or alignment constraints (`AllocError::Unsupported`).
-    pub fn alloc(&mut self, layout: Layout) -> Result<*mut u8, AllocErr> {
-        unimplemented!("bin allocation")
+    pub fn alloc(&mut self, layout: Layout) -> Result<NonNull<Opaque>, AllocErr> {
+        let bin = (layout.size() + layout.align())
+            .next_power_of_two()
+            .trailing_zeros() as usize;
+        if bin < 3 || bin > 15 + 3 {
+            return Err(AllocErr);
+        }
+
+        let bin = &mut self.bin[bin - 3];
+
+        if let Some(addr) = bin.pop() {
+            let addr = align_up(addr as usize, layout.align());
+            unsafe { Ok(NonNull::new_unchecked(addr as *mut u8).as_opaque()) }
+        } else {
+            let start = align_up(self.current, layout.align());
+            let end = start + layout.size();
+            if end >= self.end {
+                Err(AllocErr)
+            } else {
+                self.current = end;
+                unsafe { Ok(NonNull::new_unchecked(start as *mut u8).as_opaque()) }
+            }
+        }
     }
 
     /// Deallocates the memory referenced by `ptr`.
@@ -66,7 +83,11 @@ impl Allocator {
     ///
     /// Parameters not meeting these conditions may result in undefined
     /// behavior.
-    pub fn dealloc(&mut self, ptr: *mut u8, layout: Layout) {
-        unimplemented!("bin deallocation")
+    pub fn dealloc(&mut self, ptr: NonNull<Opaque>, layout: Layout) {
+        let bin = (layout.size() + layout.align())
+            .next_power_of_two()
+            .trailing_zeros() as usize;
+        let bin = &mut self.bin[bin - 3];
+        unsafe { bin.push(ptr.as_ptr() as *mut usize); }
     }
 }

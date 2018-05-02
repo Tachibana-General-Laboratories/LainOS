@@ -1,4 +1,5 @@
-use alloc::heap::{AllocErr, Layout};
+use core::alloc::{AllocErr, Layout, Opaque};
+use core::ptr::NonNull;
 
 use allocator::util::*;
 
@@ -12,7 +13,7 @@ pub struct Allocator {
 impl Allocator {
     /// Creates a new bump allocator that will allocate memory from the region
     /// starting at address `start` and ending at address `end`.
-    pub fn new(start: usize, end: usize) -> Allocator {
+    pub fn new(start: usize, end: usize) -> Self {
         Self {
             current: start,
             end,
@@ -39,15 +40,13 @@ impl Allocator {
     /// Returning `Err` indicates that either memory is exhausted
     /// (`AllocError::Exhausted`) or `layout` does not meet this allocator's
     /// size or alignment constraints (`AllocError::Unsupported`).
-    pub fn alloc(&mut self, layout: Layout) -> Result<*mut u8, AllocErr> {
+    pub fn alloc(&mut self, layout: Layout) -> Result<NonNull<Opaque>, ::core::alloc::AllocErr> {
         let start = align_up(self.current, layout.align());
         if start + layout.size() >= self.end {
-            Err(AllocErr::Exhausted {
-                request: layout,
-            })
+            Err(AllocErr)
         } else {
             self.current = start + layout.size();
-            Ok(start as *mut u8)
+            unsafe { Ok(NonNull::new_unchecked(start as *mut u8).as_opaque()) }
         }
     }
 
@@ -64,7 +63,7 @@ impl Allocator {
     ///
     /// Parameters not meeting these conditions may result in undefined
     /// behavior.
-    pub fn dealloc(&mut self, _ptr: *mut u8, _layout: Layout) {
+    pub fn dealloc(&mut self, _ptr: NonNull<Opaque>, _layout: Layout) {
         //unimplemented!("bump deallocation")
     }
 }

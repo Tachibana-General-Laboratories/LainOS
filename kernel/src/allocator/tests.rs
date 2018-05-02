@@ -59,15 +59,16 @@ mod allocator {
     #[allow(dead_code)] mod bump;
     #[allow(dead_code)] mod bin;
 
-    use alloc::allocator::{AllocErr, Layout};
-    use alloc::raw_vec::RawVec;
+    use core::alloc::{AllocErr, Layout, Opaque};
+    use core::ptr::NonNull;
 
     macro test_allocators {
         (@$kind:ident, $name:ident, $mem:expr, |$info:pat| $block:expr) => {
             #[test]
             fn $name() {
-                let mem: RawVec<u8> = RawVec::with_capacity($mem);
-                let start = mem.ptr() as usize;
+                let mem: Vec<u8> = Vec::with_capacity($mem);
+                let start = mem.as_ptr() as usize;
+                ::std::mem::forget(mem);
                 let end = start + $mem;
 
                 let allocator = $kind::Allocator::new(start, end);
@@ -91,7 +92,7 @@ mod allocator {
 
         let mut pointers: Vec<(usize, Layout)> = vec![];
         for layout in &layouts {
-            let ptr = a.alloc(layout.clone()).unwrap() as usize;
+            let ptr = a.alloc(layout.clone()).unwrap().as_ptr() as usize;
             pointers.push((ptr, layout.clone()));
         }
 
@@ -119,7 +120,7 @@ mod allocator {
 
     test_allocators!(bin_exhausted, bump_exhausted, 128, |(_, _, mut a)| {
         let e = a.alloc(layout!(1024, 128)).unwrap_err();
-        assert_eq!(e, AllocErr::Exhausted { request: layout!(1024, 128) })
+        assert_eq!(e, AllocErr)
     });
 
     test_allocators!(bin_alloc, bump_alloc, 8 * (1 << 20), |(start, end, a)| {
@@ -158,8 +159,8 @@ mod allocator {
         test_layouts!(layouts, start, end, a);
     });
 
-    fn scribble(ptr: *mut u8, size: usize) {
-        unsafe { ::std::ptr::write_bytes(ptr, 0xAF, size); }
+    fn scribble(ptr: NonNull<Opaque>, size: usize) {
+        unsafe { ::std::ptr::write_bytes(ptr.cast().as_ptr() as *mut u8, 0xAF, size); }
     }
 
     test_allocators!(bin_dealloc_s, bump_dealloc_s, 4096, |(_, _, mut a)| {
@@ -173,13 +174,14 @@ mod allocator {
         for layout in &layouts {
             let ptr = a.alloc(layout.clone()).unwrap();
             scribble(ptr, layout.size());
-            pointers.push((ptr as usize, layout.clone()));
+            pointers.push((ptr.as_ptr() as usize, layout.clone()));
         }
 
         // Just check that deallocation doesn't panic.
         for (ptr, layout) in pointers {
-            scribble(ptr as *mut u8, layout.size());
-            a.dealloc(ptr as *mut u8, layout);
+            let ptr = NonNull::new(ptr as *mut u8).unwrap().as_opaque();
+            scribble(ptr, layout.size());
+            a.dealloc(ptr, layout);
         }
     });
 
@@ -199,8 +201,8 @@ mod allocator {
             let mut ptrs = vec![];
             for _ in 0..(25 + i * 2) {
                 let ptr = a.alloc(layout.clone()).expect("allocation");
-                assert!(ptr as usize % layout.align() == 0,
-                    "{:x} is not aligned to {}", ptr as usize, layout.align());
+                assert!(ptr.as_ptr() as usize % layout.align() == 0,
+                    "{:x} is not aligned to {}", ptr.as_ptr() as usize, layout.align());
                 scribble(ptr, layout.size());
                 ptrs.push((ptr, layout.clone()));
             }
@@ -214,8 +216,8 @@ mod allocator {
             for layout in &layouts {
                 let ptr = a.alloc(layout.clone()).expect("allocation");
                 scribble(ptr, layout.size());
-                assert!(ptr as usize % layout.align() == 0,
-                    "{:x} is not aligned to {}", ptr as usize, layout.align());
+                assert!(ptr.as_ptr() as usize % layout.align() == 0,
+                    "{:x} is not aligned to {}", ptr.as_ptr() as usize, layout.align());
                 a.dealloc(ptr, layout.clone());
             }
         }
@@ -234,12 +236,13 @@ mod allocator {
             for layout in &layouts {
                 let ptr = a.alloc(layout.clone()).expect("allocation");
                 scribble(ptr, layout.size());
-                ptrs.push(ptr as usize);
+                ptrs.push(ptr.as_ptr() as usize);
             }
 
             for (layout, ptr) in layouts.iter().zip(ptrs.into_iter()) {
-                scribble(ptr as *mut u8, layout.size());
-                a.dealloc(ptr as *mut u8, layout.clone());
+                let ptr = NonNull::new(ptr as *mut u8).unwrap().as_opaque();
+                scribble(ptr, layout.size());
+                a.dealloc(ptr, layout.clone());
             }
         }
     });

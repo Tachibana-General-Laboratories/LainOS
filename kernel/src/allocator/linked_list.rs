@@ -65,8 +65,8 @@ unsafe impl Send for LinkedList {}
 
 impl LinkedList {
     /// Returns a new, empty linked list.
-    pub const fn new() -> LinkedList {
-        LinkedList { head: ptr::null_mut() }
+    pub const fn new() -> Self {
+        Self { head: ptr::null_mut() }
     }
 
     /// Returns `true` if the list is empty and `false` otherwise.

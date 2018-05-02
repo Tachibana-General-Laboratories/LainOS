@@ -1,25 +1,23 @@
 mod linked_list;
 mod util;
 
-#[path = "bump.rs"]
+#[path = "bin.rs"]
 mod imp;
-
-use slab_allocator::{Heap, MIN_HEAP_SIZE};
 
 #[cfg(test)]
 mod tests;
 
 use mutex::Mutex;
-use alloc::heap::{Alloc, AllocErr, Layout};
+use core::alloc::{Alloc, AllocErr, Layout, Opaque};
 use core::cmp::max;
+use core::ptr::NonNull;
 
 use console::kprintln;
 use pi::atags::Atags;
 
 /// Thread-safe (locking) wrapper around a particular memory allocator.
-//#[derive(Debug)]
-//pub struct Allocator(Mutex<Option<imp::Allocator>>);
-pub struct Allocator(Mutex<Option<Heap>>);
+#[derive(Debug)]
+pub struct Allocator(Mutex<Option<imp::Allocator>>);
 
 impl Allocator {
     /// Returns an uninitialized `Allocator`.
@@ -38,7 +36,7 @@ impl Allocator {
     pub fn initialize(&self) {
         let (start, end) = memory_map().expect("failed to find memory map");
         let size = end - start;
-        let heap = unsafe { Heap::new(start, size) };
+        let heap = unsafe { imp::Allocator::new(start, size) };
         *self.0.lock() = Some(heap);
     }
 }
@@ -64,7 +62,7 @@ unsafe impl<'a> Alloc for &'a Allocator {
     /// Returning `Err` indicates that either memory is exhausted
     /// (`AllocError::Exhausted`) or `layout` does not meet this allocator's
     /// size or alignment constraints (`AllocError::Unsupported`).
-    unsafe fn alloc(&mut self, layout: Layout) -> Result<*mut u8, AllocErr> {
+    unsafe fn alloc(&mut self, layout: Layout) -> Result<NonNull<Opaque>, AllocErr> {
         self.0.lock().as_mut().expect("allocator uninitialized").alloc(layout)
     }
 
@@ -81,7 +79,7 @@ unsafe impl<'a> Alloc for &'a Allocator {
     ///
     /// Parameters not meeting these conditions may result in undefined
     /// behavior.
-    unsafe fn dealloc(&mut self, ptr: *mut u8, layout: Layout) {
+    unsafe fn dealloc(&mut self, ptr: NonNull<Opaque>, layout: Layout) {
         self.0.lock().as_mut().expect("allocator uninitialized").dealloc(ptr, layout);
     }
 }
@@ -95,6 +93,7 @@ extern "C" {
 ///
 /// This function is expected to return `Some` under all normal cirumstances.
 fn memory_map() -> Option<(usize, usize)> {
+    const MIN_HEAP_SIZE: usize = 4096;
     let binary_end = unsafe { (&_end as *const u8) as u32 };
     let start = util::align_up(binary_end as usize, MIN_HEAP_SIZE);
 
