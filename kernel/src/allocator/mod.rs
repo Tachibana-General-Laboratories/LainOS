@@ -8,7 +8,7 @@ mod imp;
 mod tests;
 
 use mutex::Mutex;
-use core::alloc::{Alloc, AllocErr, Layout, Opaque};
+use core::alloc::{Alloc, GlobalAlloc, AllocErr, Layout, Opaque};
 use core::cmp::max;
 use core::ptr::NonNull;
 
@@ -80,6 +80,21 @@ unsafe impl<'a> Alloc for &'a Allocator {
     /// Parameters not meeting these conditions may result in undefined
     /// behavior.
     unsafe fn dealloc(&mut self, ptr: NonNull<Opaque>, layout: Layout) {
+        self.0.lock().as_mut().expect("allocator uninitialized").dealloc(ptr, layout);
+    }
+}
+
+unsafe impl<'a> GlobalAlloc for Allocator {
+    unsafe fn alloc(&self, layout: Layout) -> *mut Opaque {
+        let p = self.0.lock().as_mut().expect("allocator uninitialized").alloc(layout);
+        if let Ok(p) = p {
+            p.as_ptr()
+        } else {
+            ::core::ptr::null_mut() as *mut u8 as *mut Opaque
+        }
+    }
+    unsafe fn dealloc(&self, ptr: *mut Opaque, layout: Layout) {
+        let ptr = NonNull::new(ptr).unwrap();
         self.0.lock().as_mut().expect("allocator uninitialized").dealloc(ptr, layout);
     }
 }

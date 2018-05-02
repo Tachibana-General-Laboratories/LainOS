@@ -1,7 +1,7 @@
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::cell::UnsafeCell;
-use std::ops::{DerefMut, Deref, Drop};
-use std::fmt;
+use core::sync::atomic::{AtomicBool, Ordering};
+use core::cell::UnsafeCell;
+use core::ops::{DerefMut, Deref, Drop};
+use core::fmt;
 
 #[repr(align(32))]
 pub struct Mutex<T> {
@@ -20,8 +20,8 @@ impl<'a, T> !Send for MutexGuard<'a, T> { }
 unsafe impl<'a, T: Sync> Sync for MutexGuard<'a, T> { }
 
 impl<T> Mutex<T> {
-    pub const fn new(val: T) -> Mutex<T> {
-        Mutex {
+    pub const fn new(val: T) -> Self {
+        Self {
             lock: AtomicBool::new(false),
             data: UnsafeCell::new(val)
         }

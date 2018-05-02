@@ -1,4 +1,4 @@
-use std::io;
+//use std::io;
 use core::fmt;
 
 use pi::uart::MiniUart;
@@ -44,6 +44,7 @@ impl Console {
     }
 }
 
+/*
 impl io::Read for Console {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         self.inner().read(buf)
@@ -59,6 +60,7 @@ impl io::Write for Console {
         Ok(())
     }
 }
+*/
 
 impl fmt::Write for Console {
     fn write_str(&mut self, s: &str) -> fmt::Result {
@@ -74,7 +76,7 @@ pub static CONSOLE: Mutex<Console> = Mutex::new(Console::new());
 pub fn _print(args: fmt::Arguments) {
     #[cfg(not(test))]
     {
-        use std::fmt::Write;
+        use core::fmt::Write;
         let mut console = CONSOLE.lock();
         console.write_fmt(args).unwrap();
     }

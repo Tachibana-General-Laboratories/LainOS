@@ -12,22 +12,25 @@
 #![feature(pointer_methods)]
 #![feature(naked_functions)]
 #![feature(fn_must_use)]
-#![feature(alloc, allocator_api, global_allocator)]
+#![feature(alloc_system, alloc, allocator_api, global_allocator)]
 #![feature(ptr_internals)]
 #![feature(nonzero)]
 
-#[macro_use]
-extern crate bitflags;
+#![no_std]
 
-extern crate core;
+//#[macro_use]
+//extern crate bitflags;
+
+//extern crate core;
 #[macro_use]
 extern crate alloc;
-extern crate slab_allocator;
+//extern crate slab_allocator;
 //extern crate spin;
 
-extern crate sys;
+#[cfg(not(test))] extern crate sys;
+//#[cfg(not(test))]
 extern crate pi;
-extern crate sys_fs as fat32;
+//#[cfg(not(test))] extern crate sys_fs as fat32;
 
 
 /*
@@ -49,26 +52,25 @@ pub mod console;
 //#[cfg(not(test))] pub mod mmu;
 
 #[cfg(not(test))] pub mod fb;
-#[cfg(not(test))] pub mod shell;
+//#[cfg(not(test))] pub mod shell;
 
 //pub mod sd;
 //pub mod sdn;
 //pub mod gles;
 
 
-#[cfg(not(test))]
-pub mod fs;
+//#[cfg(not(test))] pub mod fs;
 pub mod allocator;
 
-use console::{kprint, kprintln};
+#[cfg(not(test))] use console::{kprint, kprintln};
 
-use allocator::Allocator;
-use fs::FileSystem;
-use process::GlobalScheduler;
+#[cfg(not(test))] use allocator::Allocator;
+//#[cfg(not(test))] use fs::FileSystem;
+#[cfg(not(test))] use process::GlobalScheduler;
 
 #[global_allocator]
 #[cfg(not(test))] pub static mut ALLOCATOR: Allocator = allocator::Allocator::uninitialized();
-#[cfg(not(test))] pub static FILE_SYSTEM: FileSystem = FileSystem::uninitialized();
+//#[cfg(not(test))] pub static FILE_SYSTEM: FileSystem = FileSystem::uninitialized();
 #[cfg(not(test))] pub static SCHEDULER: GlobalScheduler = GlobalScheduler::uninitialized();
 
 const BINARY_START_ADDR: usize = 0x8_0000; // 512kb
@@ -144,12 +146,12 @@ pub extern "C" fn el0_main() -> ! {
     uprintln!("test sleep").unwrap();
     uprintln!("test sleep: OK").unwrap();
 
-    shell::shell("user0> ")
+    //shell::shell("user0> ")
 }
 
-use traps::Error as SysErr;
+#[cfg(not(test))] use traps::Error as SysErr;
 
-fn syscall_print(s: &str) -> Result<(), SysErr> {
+#[cfg(not(test))] fn syscall_print(s: &str) -> Result<(), SysErr> {
     let error: u64;
     unsafe {
         asm!("mov x0, $1
@@ -169,7 +171,7 @@ fn syscall_print(s: &str) -> Result<(), SysErr> {
     }
 }
 
-fn syscall_sleep(ms: u32) -> Result<(), SysErr> {
+#[cfg(not(test))] fn syscall_sleep(ms: u32) -> Result<(), SysErr> {
     let error: u64;
     unsafe {
         asm!("mov x0, $0
@@ -225,8 +227,8 @@ pub extern "C" fn kernel_main() -> ! {
     unsafe {
         ALLOCATOR.initialize();
     }
-    kprintln!("fs");
-    FILE_SYSTEM.initialize();
+    //kprintln!("fs");
+    //FILE_SYSTEM.initialize();
 
 
     test_timers();

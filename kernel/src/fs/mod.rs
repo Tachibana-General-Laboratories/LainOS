@@ -38,7 +38,7 @@ impl<'a> fs::FileSystem for &'a FileSystem {
     type Entry = vfat::Entry;
 
     fn open<P: AsRef<Path>>(self, path: P) -> io::Result<Self::Entry> {
-        use std::ops::Deref;
+        use core::ops::Deref;
         match self.0.lock().deref() {
             &Some(ref vfat) => vfat.open(path),
             &None => panic!("uninitialized"),

@@ -1,12 +1,14 @@
 [dependencies]
 core = {}
 std_unicode = {}
-alloc = {}
 
-[dependencies.compiler_builtins]
-features = ["mem"]
+[dependencies.alloc]
 stage = 1
 
-[dependencies.std]
-path = "../std"
-stage = 2
+#[dependencies.compiler_builtins]
+#features = ["mem"]
+#stage = 1
+
+#[dependencies.std]
+#path = "../std"
+#stage = 2

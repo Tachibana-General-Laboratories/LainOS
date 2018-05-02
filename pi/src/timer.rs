@@ -38,13 +38,10 @@ impl Timer {
     /// interrupts for timer 1 are enabled and IRQs are unmasked, then a timer
     /// interrupt will be issued in `us` microseconds.
     pub fn tick_in(&mut self, us: u32) {
-        use std::sync::atomic::{fence, Ordering};
-        fence(Ordering::Acquire);
         let i = 1;
         self.registers.CS.write(1 << i);
         let us = self.registers.CLO.read().wrapping_add(us);
         self.registers.COMPARE[i].write(us);
-        fence(Ordering::Release);
     }
 }
 

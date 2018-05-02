@@ -1,5 +1,5 @@
 use sys::StackVec;
-use std::str::from_utf8;
+use core::str::from_utf8;
 
 //use pi::power;
 use console::{kprint, kprintln, CONSOLE};
@@ -212,14 +212,16 @@ impl Shell {
         if args.len() == 1 {
             return
         }
-        let mut dir = self.cwd.clone();
-        dir.push(args[1]);
-        match FILE_SYSTEM.open_file(&dir) {
-            Ok(mut r) => {
-                let mut w = CONSOLE.lock();
-                io::copy(&mut r, &mut *w).unwrap();
+        for arg in &args[1..] {
+            let mut dir = self.cwd.clone();
+            dir.push(arg);
+            match FILE_SYSTEM.open_file(&dir) {
+                Ok(mut r) => {
+                    let mut w = CONSOLE.lock();
+                    io::copy(&mut r, &mut *w).unwrap();
+                }
+                Err(err) => kprintln!("cat: {}", err),
             }
-            Err(err) => kprintln!("cat: {}", err),
         }
     }
 }

@@ -70,7 +70,7 @@ macro impl_for_read_write_seek($(<$($gen:tt),*>)* $T:path) {
     impl $(<$($gen),*>)* BlockDevice for $T {
         fn read_sector(&mut self, n: u64, buf: &mut [u8]) -> io::Result<usize> {
             let sector_size = self.sector_size();
-            let to_read = ::std::cmp::min(sector_size as usize, buf.len());
+            let to_read = ::core::cmp::min(sector_size as usize, buf.len());
             self.seek(io::SeekFrom::Start(n * sector_size))?;
             self.read_exact(&mut buf[..to_read])?;
             Ok(to_read)
@@ -78,7 +78,7 @@ macro impl_for_read_write_seek($(<$($gen:tt),*>)* $T:path) {
 
         fn write_sector(&mut self, n: u64, buf: &[u8]) -> io::Result<usize> {
             let sector_size = self.sector_size();
-            let to_write = ::std::cmp::min(sector_size as usize, buf.len());
+            let to_write = ::core::cmp::min(sector_size as usize, buf.len());
             self.seek(io::SeekFrom::Start(n * sector_size))?;
             self.write_all(&buf[..to_write])?;
             Ok(to_write)
@@ -86,7 +86,7 @@ macro impl_for_read_write_seek($(<$($gen:tt),*>)* $T:path) {
     }
 }
 
-impl_for_read_write_seek!(<'a> ::std::io::Cursor<&'a mut [u8]>);
-impl_for_read_write_seek!(::std::io::Cursor<Vec<u8>>);
-impl_for_read_write_seek!(::std::io::Cursor<Box<[u8]>>);
+#[cfg(test)] impl_for_read_write_seek!(<'a> ::std::io::Cursor<&'a mut [u8]>);
+#[cfg(test)] impl_for_read_write_seek!(::std::io::Cursor<Vec<u8>>);
+#[cfg(test)] impl_for_read_write_seek!(::std::io::Cursor<Box<[u8]>>);
 #[cfg(test)] impl_for_read_write_seek!(::std::fs::File);

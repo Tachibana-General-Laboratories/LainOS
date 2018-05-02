@@ -1,10 +1,11 @@
 use core::mem;
-use core::nonzero::NonZero;
+use core::num::NonZeroU64;
 use traps::TrapFrame;
 use process::{State, Stack};
+use alloc::boxed::Box;
 
 /// Type alias for the type of a process ID.
-pub type Id = NonZero<u64>;
+pub type Id = NonZeroU64;
 
 /// A structure that represents the complete state of a process.
 #[derive(Debug)]
@@ -73,6 +74,6 @@ impl Process {
     }
 
     pub fn id(&self) -> Option<Id> {
-        NonZero::new(self.trap_frame.tpidr)
+        NonZeroU64::new(self.trap_frame.tpidr)
     }
 }

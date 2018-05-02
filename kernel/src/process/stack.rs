@@ -1,5 +1,5 @@
 use core::fmt;
-use core::ptr::Unique;
+use core::ptr::{Unique, NonNull};
 
 use ALLOCATOR;
 use alloc::allocator::{Alloc, Layout};
@@ -27,7 +27,7 @@ impl Stack {
     /// fails for some other reason, returns `None`.
     pub fn new() -> Option<Stack> {
         let raw_ptr = unsafe {
-            let raw_ptr: *mut u8 = (&ALLOCATOR).alloc(Stack::layout()).ok()?;
+            let raw_ptr: *mut u8 = (&ALLOCATOR).alloc(Stack::layout()).ok()?.cast().as_ptr();
             raw_ptr.write_bytes(0, Self::SIZE);
             raw_ptr
         };
@@ -55,7 +55,8 @@ impl Stack {
 impl Drop for Stack {
     fn drop(&mut self) {
         unsafe {
-            (&ALLOCATOR).dealloc(self.as_mut_ptr(), Self::layout())
+            let ptr = NonNull::new_unchecked(self.as_mut_ptr());
+            (&ALLOCATOR).dealloc(ptr.as_opaque(), Self::layout())
         }
     }
 }

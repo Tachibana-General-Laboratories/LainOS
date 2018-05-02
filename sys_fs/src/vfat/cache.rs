@@ -1,7 +1,7 @@
 use std::{io, fmt};
 use std::collections::HashMap;
 use std::collections::hash_map::Entry;
-use fnv::*;
+//use fnv::*;
 
 use sys::fs::BlockDevice;
 
@@ -20,7 +20,7 @@ struct CacheEntry {
 
 pub struct CachedDevice {
     device: Box<BlockDevice>,
-    cache: HashMap<u64, CacheEntry, FnvBuildHasher>,
+    cache: HashMap<u64, CacheEntry>,
     partition: Partition,
 }
 

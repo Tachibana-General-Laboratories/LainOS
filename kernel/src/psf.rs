@@ -1,4 +1,4 @@
-use std::slice::from_raw_parts;
+use core::slice::from_raw_parts;
 
 pub struct Font {
     glyphs: &'static [u8],

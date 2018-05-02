@@ -1,5 +1,5 @@
 use alloc::VecDeque;
-use core::nonzero::NonZero;
+use core::num::NonZeroU64;
 use core::mem;
 
 use mutex::Mutex;
@@ -48,7 +48,7 @@ impl GlobalScheduler {
         process.trap_frame.elr = (el0_main as *const ()) as u64;
 
         let tf = {
-            let p = (&*process.trap_frame);
+            let p = &*process.trap_frame;
             let tf = p as *const TrapFrame as u64;
             mem::forget(p);
             tf
@@ -103,10 +103,10 @@ impl Scheduler {
          let id = match self.last_id {
             Some(id) => {
                 let id = id.get().checked_add(1)?;
-                unsafe { NonZero::new_unchecked(id) }
+                unsafe { NonZeroU64::new_unchecked(id) }
             }
             None => {
-                let id = unsafe { NonZero::new_unchecked(1) };
+                let id = unsafe { NonZeroU64::new_unchecked(1) };
                 process.state = State::Running;
                 self.current = Some(id);
                 id

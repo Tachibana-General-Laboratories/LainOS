@@ -7,7 +7,11 @@
 #[cfg(not(target_endian="little"))]
 compile_error!("only little endian platforms supported");
 
-extern crate fnv;
+#[no_std]
+
+extern crate alloc;
+
+//extern crate fnv;
 extern crate sys;
 
 #[cfg(test)]

@@ -1,4 +1,5 @@
 use core::fmt;
+use alloc::boxed::Box;
 
 use process::Process;
 
