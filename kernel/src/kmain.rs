@@ -30,7 +30,7 @@ extern crate alloc;
 #[cfg(not(test))] extern crate sys;
 //#[cfg(not(test))]
 extern crate pi;
-//#[cfg(not(test))] extern crate sys_fs as fat32;
+#[cfg(not(test))] extern crate sys_fs as fat32;
 
 
 /*
@@ -44,8 +44,6 @@ extern crate log;
 #[cfg(not(test))] pub mod traps;
 #[cfg(not(test))] pub mod vm;
 
-
-pub mod mutex;
 pub mod console;
 
 #[cfg(not(test))] pub mod panic;
@@ -59,18 +57,18 @@ pub mod console;
 //pub mod gles;
 
 
-//#[cfg(not(test))] pub mod fs;
+#[cfg(not(test))] pub mod fs;
 pub mod allocator;
 
 #[cfg(not(test))] use console::{kprint, kprintln};
 
 #[cfg(not(test))] use allocator::Allocator;
-//#[cfg(not(test))] use fs::FileSystem;
+#[cfg(not(test))] use fs::FileSystem;
 #[cfg(not(test))] use process::GlobalScheduler;
 
 #[global_allocator]
 #[cfg(not(test))] pub static mut ALLOCATOR: Allocator = allocator::Allocator::uninitialized();
-//#[cfg(not(test))] pub static FILE_SYSTEM: FileSystem = FileSystem::uninitialized();
+#[cfg(not(test))] pub static FILE_SYSTEM: FileSystem = FileSystem::uninitialized();
 #[cfg(not(test))] pub static SCHEDULER: GlobalScheduler = GlobalScheduler::uninitialized();
 
 const BINARY_START_ADDR: usize = 0x8_0000; // 512kb

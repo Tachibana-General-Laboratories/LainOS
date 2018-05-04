@@ -71,7 +71,7 @@ pub fn print(s: *const u8, len: usize, tf: &mut TrapFrame) -> Result<(), Error> 
 
     let s = from_utf8(unsafe { from_raw_parts(s, len) })
         .map_err(|_| Error::Utf8)?;
-    CONSOLE.lock().write_str(s)
+    CONSOLE.lock().unwrap().write_str(s)
         .map_err(|_| Error::Io)
 }
 

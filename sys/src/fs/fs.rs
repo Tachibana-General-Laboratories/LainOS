@@ -1,33 +1,16 @@
-use std::io;
-use std::path::Path;
+use fs::io::*;
 
 use fs::Metadata;
+use alloc::string::ToString;
 
 /// Trait implemented by files in the file system.
-pub trait File: io::Read + io::Write + io::Seek + Sized {
+pub trait File: Read + Write + Seek + Sized {
     /// Writes any buffered data to disk.
-    fn sync(&mut self) -> io::Result<()>;
+    fn sync(&mut self) -> Result<()>;
 
     /// Returns the size of the file in bytes.
     fn size(&self) -> u64;
 }
-
-/*
-pub enum SeekFrom {
-    Start(u64),
-    End(i64),
-    Current(i64),
-}
-pub trait XFile: Sized {
-    fn sync(&mut self) -> io::Result<()>;
-    fn size(&self) -> u64;
-
-    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize>;
-    fn write(&mut self, buf: &[u8]) -> io::Result<usize>;
-    fn flush(&mut self) -> io::Result<()>;
-    fn seek(&mut self, pos: SeekFrom) -> io::Result<u64>;
-}
-*/
 
 /// Trait implemented by directories in a file system.
 pub trait Dir: Sized {
@@ -38,7 +21,7 @@ pub trait Dir: Sized {
     type Iter: Iterator<Item = Self::Entry>;
 
     /// Returns an interator over the entries in this directory.
-    fn entries(&self) -> io::Result<Self::Iter>;
+    fn entries(&self) -> Result<Self::Iter>;
 }
 
 /// Trait implemented by directory entries in a file system.
@@ -106,7 +89,7 @@ pub trait FileSystem: Sized {
     /// If there is no entry at `path`, an error kind of `NotFound` is returned.
     ///
     /// All other error values are implementation defined.
-    fn open<P: AsRef<Path>>(self, path: P) -> io::Result<Self::Entry>;
+    fn open(self, path: &str) -> Result<Self::Entry>;
 
     /// Opens the file at `path`. `path` must be absolute.
     ///
@@ -114,10 +97,10 @@ pub trait FileSystem: Sized {
     ///
     /// In addition to the error conditions for `open()`, this method returns an
     /// error kind of `Other` if the entry at `path` is not a regular file.
-    fn open_file<P: AsRef<Path>>(self, path: P) -> io::Result<Self::File> {
+    fn open_file(self, path: &str) -> Result<Self::File> {
         self.open(path)?
             .into_file()
-            .ok_or(io::Error::new(io::ErrorKind::Other, "not a regular file"))
+            .ok_or(Error::Other("not a regular file".to_string()))
     }
 
     /// Opens the directory at `path`. `path` must be absolute.
@@ -126,10 +109,10 @@ pub trait FileSystem: Sized {
     ///
     /// In addition to the error conditions for `open()`, this method returns an
     /// error kind of `Other` if the entry at `path` is not a directory.
-    fn open_dir<P: AsRef<Path>>(self, path: P) -> io::Result<Self::Dir> {
+    fn open_dir(self, path: &str) -> Result<Self::Dir> {
         self.open(path)?
             .into_dir()
-            .ok_or(io::Error::new(io::ErrorKind::Other, "not a directory"))
+            .ok_or(Error::Other("not a directory".to_string()))
     }
 
     /// Creates a new file at `path`, opens it, and returns it.
@@ -147,7 +130,7 @@ pub trait FileSystem: Sized {
     /// is returned.
     ///
     /// All other error values are implementation defined.
-    fn create_file<P: AsRef<Path>>(self, path: P) -> io::Result<Self::File>;
+    fn create_file(self, path: &str) -> Result<Self::File>;
 
     /// Creates a new directory at `path`, opens it, and returns it. If
     /// `parents` is `true`, also creates all non-existent directories leading
@@ -167,7 +150,7 @@ pub trait FileSystem: Sized {
     /// is returned.
     ///
     /// All other error values are implementation defined.
-    fn create_dir<P: AsRef<Path>>(self, path: P, parents: bool) -> io::Result<Self::Dir>;
+    fn create_dir(self, path: &str, parents: bool) -> Result<Self::Dir>;
 
     /// Renames the entry at path `from` to `to`. But `from` and `to` must be
     /// absolute.
@@ -183,7 +166,7 @@ pub trait FileSystem: Sized {
     /// If there is no entry at `from`, an error kind of `NotFound` is returned.
     ///
     /// All other error values are implementation defined.
-    fn rename<P: AsRef<Path>, Q: AsRef<Path>>(self, from: P, to: Q) -> io::Result<()>;
+    fn rename(self, from: &str, to: &str) -> Result<()>;
 
     /// Removes the entry at `path`. If `children` is `true` and `path` is a
     /// directory, all files in that directory are recursively removed.
@@ -200,5 +183,5 @@ pub trait FileSystem: Sized {
     /// error kind of `Other` is returned.
     ///
     /// All other error values are implementation defined.
-    fn remove<P: AsRef<Path>>(self, path: P, children: bool) -> io::Result<()>;
+    fn remove(self, path: &str, children: bool) -> Result<()>;
 }

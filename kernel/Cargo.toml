@@ -7,7 +7,7 @@ version = "0.1.0"
 #slab_allocator = "0.3.0"
 #bitflags = "1"
 
-#sys_fs = { path = "../sys_fs" }
+sys_fs = { path = "../sys_fs" }
 sys = { path = "../sys" }
 pi = { path = "../pi", features = [] }
 #pi = { path = "../pi" }

@@ -3,7 +3,7 @@ name = "sys_fs"
 version = "0.1.0"
 
 [dependencies]
-fnv = "1"
+#fnv = "1"
 sys = { path = "../sys" }
 
 [dev-dependencies]

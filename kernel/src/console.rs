@@ -2,7 +2,7 @@
 use core::fmt;
 
 use pi::uart::MiniUart;
-use mutex::Mutex;
+use sys::Mutex;
 
 /// A global singleton allowing read/write access to the console.
 pub struct Console {
@@ -77,7 +77,7 @@ pub fn _print(args: fmt::Arguments) {
     #[cfg(not(test))]
     {
         use core::fmt::Write;
-        let mut console = CONSOLE.lock();
+        let mut console = CONSOLE.lock().unwrap();
         console.write_fmt(args).unwrap();
     }
 

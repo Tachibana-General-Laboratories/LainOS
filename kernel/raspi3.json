@@ -18,6 +18,7 @@
   "features": "+a53,+strict-align",
   "max-atomic-width": 128,
   "os": "none",
+  "os": "lainos",
   "panic": "abort",
   "panic-strategy": "abort",
   "position-independent-executables": true,

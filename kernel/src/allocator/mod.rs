@@ -7,7 +7,7 @@ mod imp;
 #[cfg(test)]
 mod tests;
 
-use mutex::Mutex;
+use sys::Mutex;
 use core::alloc::{Alloc, GlobalAlloc, AllocErr, Layout, Opaque};
 use core::cmp::max;
 use core::ptr::NonNull;
@@ -36,8 +36,8 @@ impl Allocator {
     pub fn initialize(&self) {
         let (start, end) = memory_map().expect("failed to find memory map");
         let size = end - start;
-        let heap = unsafe { imp::Allocator::new(start, size) };
-        *self.0.lock() = Some(heap);
+        let heap = imp::Allocator::new(start, size);
+        *self.0.lock().unwrap() = Some(heap);
     }
 }
 
@@ -63,7 +63,7 @@ unsafe impl<'a> Alloc for &'a Allocator {
     /// (`AllocError::Exhausted`) or `layout` does not meet this allocator's
     /// size or alignment constraints (`AllocError::Unsupported`).
     unsafe fn alloc(&mut self, layout: Layout) -> Result<NonNull<Opaque>, AllocErr> {
-        self.0.lock().as_mut().expect("allocator uninitialized").alloc(layout)
+        self.0.lock().unwrap().as_mut().expect("allocator uninitialized").alloc(layout)
     }
 
     /// Deallocates the memory referenced by `ptr`.
@@ -80,13 +80,13 @@ unsafe impl<'a> Alloc for &'a Allocator {
     /// Parameters not meeting these conditions may result in undefined
     /// behavior.
     unsafe fn dealloc(&mut self, ptr: NonNull<Opaque>, layout: Layout) {
-        self.0.lock().as_mut().expect("allocator uninitialized").dealloc(ptr, layout);
+        self.0.lock().unwrap().as_mut().expect("allocator uninitialized").dealloc(ptr, layout);
     }
 }
 
 unsafe impl<'a> GlobalAlloc for Allocator {
     unsafe fn alloc(&self, layout: Layout) -> *mut Opaque {
-        let p = self.0.lock().as_mut().expect("allocator uninitialized").alloc(layout);
+        let p = self.0.lock().unwrap().as_mut().expect("allocator uninitialized").alloc(layout);
         if let Ok(p) = p {
             p.as_ptr()
         } else {
@@ -95,7 +95,7 @@ unsafe impl<'a> GlobalAlloc for Allocator {
     }
     unsafe fn dealloc(&self, ptr: *mut Opaque, layout: Layout) {
         let ptr = NonNull::new(ptr).unwrap();
-        self.0.lock().as_mut().expect("allocator uninitialized").dealloc(ptr, layout);
+        self.0.lock().unwrap().as_mut().expect("allocator uninitialized").dealloc(ptr, layout);
     }
 }
 

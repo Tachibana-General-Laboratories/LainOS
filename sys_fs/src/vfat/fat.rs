@@ -1,4 +1,4 @@
-use std::fmt;
+use core::fmt;
 use vfat::*;
 
 use self::Status::*;

@@ -1,4 +1,5 @@
-use std::fmt;
+use core::fmt;
+use core::mem;
 
 use sys::fs::BlockDevice;
 use vfat::Error;
@@ -49,13 +50,11 @@ impl BiosParameterBlock {
         mut device: T,
         sector: u64
     ) -> Result<BiosParameterBlock, Error> {
-        use util::SliceExt;
-
         let mut buf = [0u8; 512];
         if let Err(err) = device.read_sector(sector, &mut buf[..]) {
             return Err(Error::Io(err))
         }
-        let r: Self = unsafe { ::std::mem::transmute(buf) };
+        let r: Self = unsafe { mem::transmute(buf) };
 
         if r.signature[0] != 0x55 || r.signature[1] != 0xAA {
             return Err(Error::BadSignature);

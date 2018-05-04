@@ -1,5 +1,6 @@
-use std::io;
+use sys::fs::io;
 use sys::fs::BlockDevice;
+use alloc::string::ToString;
 
 use pi::common::spin_sleep_us;
 
@@ -70,17 +71,17 @@ impl BlockDevice for Sd {
     ///
     /// An error of kind `Other` is returned for all other errors.
     fn read_sector(&mut self, n: u64, buf: &mut [u8]) -> io::Result<usize> {
-        if buf.len() < 512 || buf.len() > ::std::i32::MAX as usize {
-            Err(io::Error::new(io::ErrorKind::InvalidInput, "buf.len() out of bound"))
+        if buf.len() < 512 || buf.len() > ::core::i32::MAX as usize {
+            Err(io::Error::InvalidInput("buf.len() out of bound".to_string()))
         } else {
             let n = unsafe { sd_readsector(n as i32, buf.as_mut_ptr()) };
             let errno = unsafe { sd_err };
             if n > 0 {
                 Ok(n as usize)
             } else if errno == -1 {
-                Err(io::Error::new(io::ErrorKind::TimedOut, "sd card timeout"))
+                Err(io::Error::TimedOut("sd card timeout".to_string()))
             } else {
-                Err(io::Error::new(io::ErrorKind::Other, format!("sd_err: {}", errno)))
+                Err(io::Error::Other(format!("sd_err: {}", errno)))
             }
         }
     }

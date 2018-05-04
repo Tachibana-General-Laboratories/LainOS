@@ -1,6 +1,8 @@
-use std::{io, fmt};
-use std::collections::HashMap;
-use std::collections::hash_map::Entry;
+use core::fmt;
+use sys::prelude::*;
+use sys::fs::io;
+use sys::hash_map::Entry;
+use sys::HashMap;
 //use fnv::*;
 
 use sys::fs::BlockDevice;

@@ -1,9 +1,11 @@
-use std::io;
-use std::path::Path;
-use std::mem::size_of;
-use std::cmp::min;
+use sys::fs::io;
+use sys::Vec;
+use sys::SliceExt;
+use sys::prelude::ToString;
 
-use util::SliceExt;
+use core::mem::size_of;
+use core::cmp::min;
+
 use mbr::MasterBootRecord;
 use vfat::{Shared, Cluster, File, Dir, Entry, FatEntry, Error, Status};
 use vfat::{BiosParameterBlock, CachedDevice, Partition};
@@ -69,13 +71,14 @@ impl VFat {
     }
 
     /// A method to read from an offset of a cluster into a buffer.
-    pub fn read_cluster(&mut self, mut cluster: Cluster, mut offset: usize, buf: &mut [u8]) -> io::Result<usize> {
+    pub fn read_cluster(&mut self, mut cluster: Cluster, mut offset: usize, mut buf: &mut [u8]) -> io::Result<usize> {
         use vfat::Status::*;
-        use std::io::{Cursor, Write};
+        use sys::fs::*;
+
         let bytes_per_sector = self.bytes_per_sector as usize;
 
         let mut tmp = Vec::with_capacity(bytes_per_sector);
-        let mut cursor = Cursor::new(buf);
+        let current_len = buf.len();
 
         'end:
         loop {
@@ -91,7 +94,7 @@ impl VFat {
                     if offset >= tmp.len() {
                         break 'end;
                     }
-                    if cursor.write(&tmp[offset..])? == 0 {
+                    if buf.write(&tmp[offset..])? == 0 {
                         break 'end;
                     }
                 }
@@ -105,7 +108,7 @@ impl VFat {
                 _ => break,
             }
         }
-        Ok(cursor.position() as usize)
+        Ok(current_len - buf.len())
     }
 
     /// A method to read all of the clusters chained from a starting cluster
@@ -161,43 +164,30 @@ impl<'a> FileSystem for &'a Shared<VFat> {
     type Dir = Dir;
     type Entry = Entry;
 
-    fn open<P: AsRef<Path>>(self, path: P) -> io::Result<Self::Entry> {
-        use std::path::*;
+    fn open(self, path: &str) -> io::Result<Self::Entry> {
         let mut root = Dir::root(self.clone());
-        for c in path.as_ref().components() {
-            match c {
-                Component::Normal(p) => {
-                    match root.find(p)? {
-                        file @ Entry::File(_) => return Ok(file),
-                        Entry::Dir(dir) => root = dir,
-                    }
-                }
-                Component::RootDir => (),
-                Component::CurDir => (),
-                Component::ParentDir => unimplemented!(),
-                Component::Prefix(_) => return Err(io::Error::new(io::ErrorKind::InvalidInput, "prefix don't support")),
+        for name in path.split_terminator('/') {
+            match root.find(name)? {
+                file @ Entry::File(_) => return Ok(file),
+                Entry::Dir(dir) => root = dir,
             }
         }
         Ok(Entry::Dir(root))
     }
 
-    fn create_file<P: AsRef<Path>>(self, _path: P) -> io::Result<Self::File> {
+    fn create_file(self, _path: &str) -> io::Result<Self::File> {
         unimplemented!("read only file system")
     }
 
-    fn create_dir<P>(self, _path: P, _parents: bool) -> io::Result<Self::Dir>
-        where P: AsRef<Path>
-    {
+    fn create_dir(self, _path: &str, _parents: bool) -> io::Result<Self::Dir> {
         unimplemented!("read only file system")
     }
 
-    fn rename<P, Q>(self, _from: P, _to: Q) -> io::Result<()>
-        where P: AsRef<Path>, Q: AsRef<Path>
-    {
+    fn rename(self, _from: &str, _to: &str) -> io::Result<()> {
         unimplemented!("read only file system")
     }
 
-    fn remove<P: AsRef<Path>>(self, _path: P, _children: bool) -> io::Result<()> {
+    fn remove(self, _path: &str, _children: bool) -> io::Result<()> {
         unimplemented!("read only file system")
     }
 }

@@ -43,11 +43,11 @@ impl<T> Mutex<T> {
     // Once MMU/cache is enabled, do the right thing here. For now, we don't
     // need any real synchronization.
     #[inline(never)]
-    pub fn lock(&self) -> MutexGuard<T> {
+    pub fn lock(&self) -> Option<MutexGuard<T>> {
         // Wait until we can "aquire" the lock, then "acquire" it.
         loop {
             match self.try_lock() {
-                Some(guard) => return guard,
+                Some(guard) => return Some(guard),
                 None => continue
             }
         }

@@ -1,5 +1,6 @@
-use std::cmp::{min, max};
-use std::io::{self, SeekFrom};
+use core::cmp::{min, max};
+use sys::fs::io::{self, SeekFrom};
+use sys::prelude::*;
 
 use sys;
 use vfat::{VFat, Shared, Cluster, Metadata};
@@ -47,7 +48,7 @@ impl io::Seek for File {
                 self.position = pos;
                 Ok(pos)
             }
-            _ => Err(io::Error::new(io::ErrorKind::InvalidInput, "invalid seek")),
+            _ => Err(io::Error::InvalidInput("invalid seek".to_string())),
         }
     }
 }

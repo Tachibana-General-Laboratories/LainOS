@@ -1,15 +1,17 @@
 #![feature(decl_macro, conservative_impl_trait)]
 #![feature(entry_and_modify)]
 #![feature(option_filter)]
-#![allow(safe_packed_borrows)]
 #![feature(pointer_methods)]
+#![feature(alloc)]
+
+#![allow(safe_packed_borrows)]
+
+#![no_std]
 
 #[cfg(not(target_endian="little"))]
 compile_error!("only little endian platforms supported");
 
-#[no_std]
-
-extern crate alloc;
+//extern crate alloc;
 
 //extern crate fnv;
 extern crate sys;
@@ -21,7 +23,6 @@ extern crate rand;
 mod tests;
 
 mod mbr;
-mod util;
 
 pub mod vfat;
 

@@ -1,12 +1,13 @@
 pub mod sd;
 
-use std::io;
-use std::path::Path;
+use core::ops::Deref;
+
+pub use sys::fs;
+use sys::fs::io;
 
 use fat32::vfat::{self, Shared, VFat};
-pub use sys::fs;
 
-use mutex::Mutex;
+use sys::Mutex;
 use self::sd::Sd;
 
 pub struct FileSystem(pub Mutex<Option<Shared<VFat>>>);
@@ -28,7 +29,7 @@ impl FileSystem {
     pub fn initialize(&self) {
         let sd = Sd::new().unwrap();
         let vfat = VFat::from(sd).unwrap();
-        *self.0.lock() = Some(vfat);
+        *self.0.lock().unwrap() = Some(vfat);
     }
 }
 
@@ -37,31 +38,38 @@ impl<'a> fs::FileSystem for &'a FileSystem {
     type Dir = vfat::Dir;
     type Entry = vfat::Entry;
 
-    fn open<P: AsRef<Path>>(self, path: P) -> io::Result<Self::Entry> {
-        use core::ops::Deref;
-        match self.0.lock().deref() {
+    fn open(self, path: &str) -> io::Result<Self::Entry> {
+        match self.0.lock().unwrap().deref() {
             &Some(ref vfat) => vfat.open(path),
             &None => panic!("uninitialized"),
         }
     }
 
-    fn create_file<P: AsRef<Path>>(self, _path: P) -> io::Result<Self::File> {
-        unimplemented!("read only file system")
+    fn create_file(self, path: &str) -> io::Result<Self::File> {
+        match self.0.lock().unwrap().deref() {
+            &Some(ref vfat) => vfat.create_file(path),
+            &None => panic!("uninitialized"),
+        }
     }
 
-    fn create_dir<P>(self, _path: P, _parents: bool) -> io::Result<Self::Dir>
-        where P: AsRef<Path>
-    {
-        unimplemented!("read only file system")
+    fn create_dir(self, path: &str, parents: bool) -> io::Result<Self::Dir> {
+        match self.0.lock().unwrap().deref() {
+            &Some(ref vfat) => vfat.create_dir(path, parents),
+            &None => panic!("uninitialized"),
+        }
     }
 
-    fn rename<P, Q>(self, _from: P, _to: Q) -> io::Result<()>
-        where P: AsRef<Path>, Q: AsRef<Path>
-    {
-        unimplemented!("read only file system")
+    fn rename(self, from: &str, to: &str) -> io::Result<()> {
+        match self.0.lock().unwrap().deref() {
+            &Some(ref vfat) => vfat.rename(from, to),
+            &None => panic!("uninitialized"),
+        }
     }
 
-    fn remove<P: AsRef<Path>>(self, _path: P, _children: bool) -> io::Result<()> {
-        unimplemented!("read only file system")
+    fn remove(self, path: &str, children: bool) -> io::Result<()> {
+        match self.0.lock().unwrap().deref() {
+            &Some(ref vfat) => vfat.remove(path, children),
+            &None => panic!("uninitialized"),
+        }
     }
 }

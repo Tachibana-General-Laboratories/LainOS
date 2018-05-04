@@ -1,4 +1,4 @@
-use std::io;
+use sys::fs::io;
 
 use mbr;
 

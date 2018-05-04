@@ -1,5 +1,7 @@
-use std::{fmt, io};
+use core::fmt;
+use core::mem;
 
+use sys::fs::io;
 use sys::fs::BlockDevice;
 
 #[repr(C, packed)]
@@ -52,7 +54,7 @@ impl MasterBootRecord {
         if let Err(err) = device.read_sector(0, &mut buf[..]) {
             return Err(Error::Io(err))
         }
-        let r: Self = unsafe { ::std::mem::transmute(buf) };
+        let r: Self = unsafe { mem::transmute(buf) };
 
         if r.signature[0] != 0x55 || r.signature[1] != 0xAA {
             return Err(Error::BadSignature);

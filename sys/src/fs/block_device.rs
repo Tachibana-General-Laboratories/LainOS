@@ -1,4 +1,5 @@
-use std::io;
+use fs::Result;
+use alloc::Vec;
 
 /// Trait implemented by devices that can be read/written in sector
 /// granularities.
@@ -16,7 +17,7 @@ pub trait BlockDevice: Send {
     /// # Errors
     ///
     /// Returns an error if seeking or reading from `self` fails.
-    fn read_sector(&mut self, n: u64, buf: &mut [u8]) -> io::Result<usize>;
+    fn read_sector(&mut self, n: u64, buf: &mut [u8]) -> Result<usize>;
 
     /// Append sector number `n` into `vec`.
     ///
@@ -26,7 +27,7 @@ pub trait BlockDevice: Send {
     /// # Errors
     ///
     /// Returns an error if seeking or reading from `self` fails.
-    fn read_all_sector(&mut self, n: u64, vec: &mut Vec<u8>) -> io::Result<usize> {
+    fn read_all_sector(&mut self, n: u64, vec: &mut Vec<u8>) -> Result<usize> {
         let sector_size = self.sector_size() as usize;
 
         let start = vec.len();
@@ -51,21 +52,21 @@ pub trait BlockDevice: Send {
     /// Returns an error if seeking or writing to `self` fails. Returns an
     /// error of `UnexpectedEof` if the length of `buf` is less than
     /// `self.sector_size()`.
-    fn write_sector(&mut self, n: u64, buf: &[u8]) -> io::Result<usize>;
+    fn write_sector(&mut self, n: u64, buf: &[u8]) -> Result<usize>;
 }
 
 impl<'a, T: BlockDevice> BlockDevice for &'a mut T {
-    fn read_sector(&mut self, n: u64, buf: &mut [u8]) -> io::Result<usize> {
+    fn read_sector(&mut self, n: u64, buf: &mut [u8]) -> Result<usize> {
         (*self).read_sector(n, buf)
     }
 
-    fn write_sector(&mut self, n: u64, buf: &[u8]) -> io::Result<usize> {
+    fn write_sector(&mut self, n: u64, buf: &[u8]) -> Result<usize> {
         (*self).write_sector(n, buf)
     }
 }
 
 macro impl_for_read_write_seek($(<$($gen:tt),*>)* $T:path) {
-    use std::io::{Read, Write, Seek};
+    use std::io::{self, Read, Write, Seek};
 
     impl $(<$($gen),*>)* BlockDevice for $T {
         fn read_sector(&mut self, n: u64, buf: &mut [u8]) -> io::Result<usize> {
