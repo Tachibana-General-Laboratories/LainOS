@@ -9,7 +9,6 @@ mod tests;
 
 use sys::Mutex;
 use core::alloc::{Alloc, GlobalAlloc, AllocErr, Layout, Opaque};
-use core::cmp::max;
 use core::ptr::NonNull;
 
 use console::kprintln;

@@ -231,14 +231,6 @@ context_restore:
 
     ret
 
-.global xsvc
-xsvc:
-    #mov x8, #666
-    #mov x29, #999
-    svc #666
-    ret
-
-
 // macro to align handlers every 0x80 bytes
 //.balign 0x80
 

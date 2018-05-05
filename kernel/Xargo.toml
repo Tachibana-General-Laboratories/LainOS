@@ -1,6 +1,8 @@
 [dependencies]
-core = {}
 std_unicode = {}
+
+[dependencies.core]
+stage = 0
 
 [dependencies.alloc]
 stage = 1

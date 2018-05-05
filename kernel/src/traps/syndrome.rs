@@ -1,5 +1,3 @@
-#![deny(unreachable_pattern)]
-
 #[derive(Debug, PartialEq, Copy, Clone)]
 pub enum Fault {
     AddressSize,

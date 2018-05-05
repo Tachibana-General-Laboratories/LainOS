@@ -43,8 +43,6 @@ impl From<u64> for Error {
 //     - If x7 is any other value, it represents an error code specific to the system call.
 // - All other registers and program state are preserved by the kernel.
 
-
-
 /// Sleep for `ms` milliseconds.
 ///
 /// This system call takes one parameter: the number of milliseconds to sleep.
@@ -55,7 +53,7 @@ impl From<u64> for Error {
 pub fn sleep(ms: u32, tf: &mut TrapFrame) {
     let exit_time = current_time() + 1000 * ms as u64;
     let f = Box::new(move |p: &mut Process| {
-        let elapsed = exit_time.checked_sub(current_time());
+        let elapsed = current_time().checked_sub(exit_time);
         if let Some(elapsed) = elapsed {
             p.trap_frame.x0 = (elapsed / 1000) & 0xFFFF_FFFF;
             true
@@ -63,10 +61,10 @@ pub fn sleep(ms: u32, tf: &mut TrapFrame) {
             false
         }
     });
-    SCHEDULER.switch(State::Waiting(f), tf);
+    SCHEDULER.switch(State::Waiting(f), tf).expect("sleep");
 }
 
-pub fn print(s: *const u8, len: usize, tf: &mut TrapFrame) -> Result<(), Error> {
+pub fn print(s: *const u8, len: usize) -> Result<(), Error> {
     use core::fmt::Write;
 
     let s = from_utf8(unsafe { from_raw_parts(s, len) })
@@ -80,7 +78,7 @@ pub fn handle_syscall(num: u16, tf: &mut TrapFrame) {
     match num {
         1 => sleep(tf.x0 as u32, tf),
         2 => {
-            if let Err(err) = print(tf.x0 as *const u8, tf.x1 as usize, tf) {
+            if let Err(err) = print(tf.x0 as *const u8, tf.x1 as usize) {
                 tf.x7 = err as u64;
             }
         }

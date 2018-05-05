@@ -1,14 +1,15 @@
-use core::fmt;
 use core::alloc::{AllocErr, Layout, Opaque};
 use core::ptr::NonNull;
 
 use allocator::util::*;
 use allocator::linked_list::LinkedList;
 
+const BIN_COUNT: usize = 32;
+
 /// A simple allocator that allocates based on size classes.
 #[derive(Debug)]
 pub struct Allocator {
-    bin: [LinkedList; 16],
+    bin: [LinkedList; BIN_COUNT],
 
     current: usize,
     end: usize,
@@ -19,7 +20,7 @@ impl Allocator {
     /// starting at address `start` and ending at address `end`.
     pub fn new(start: usize, end: usize) -> Self {
         Self {
-            bin: [LinkedList::new(); 16],
+            bin: [LinkedList::new(); BIN_COUNT],
             current: start,
             end,
         }
@@ -49,7 +50,7 @@ impl Allocator {
         let bin = (layout.size() + layout.align())
             .next_power_of_two()
             .trailing_zeros() as usize;
-        if bin < 3 || bin > 15 + 3 {
+        if bin < 3 || bin >= BIN_COUNT + 3 {
             return Err(AllocErr);
         }
 

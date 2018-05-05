@@ -6,7 +6,6 @@
 #![feature(decl_macro)]
 #![feature(attr_literals)]
 #![feature(exclusive_range_pattern)]
-#![feature(i128_type)]
 #![feature(never_type)]
 #![feature(unique)]
 #![feature(pointer_methods)]
@@ -55,6 +54,8 @@ pub mod console;
 //pub mod sd;
 //pub mod sdn;
 //pub mod gles;
+//
+#[cfg(not(test))] pub mod user;
 
 
 #[cfg(not(test))] pub mod fs;
@@ -67,7 +68,7 @@ pub mod allocator;
 #[cfg(not(test))] use process::GlobalScheduler;
 
 #[global_allocator]
-#[cfg(not(test))] pub static mut ALLOCATOR: Allocator = allocator::Allocator::uninitialized();
+#[cfg(not(test))] pub static mut ALLOCATOR: Allocator = Allocator::uninitialized();
 #[cfg(not(test))] pub static FILE_SYSTEM: FileSystem = FileSystem::uninitialized();
 #[cfg(not(test))] pub static SCHEDULER: GlobalScheduler = GlobalScheduler::uninitialized();
 
@@ -86,107 +87,6 @@ const ADDR_256MB: usize = 0x1000_0000;
 const ADDR_512MB: usize = 0x2000_0000;
 const ADDR_1GB: usize   = 0x4000_0000;
 const ADDR_2GB: usize   = 0x8000_0000;
-
-
-extern "C" {
-    fn xsvc(a: u64, b: u64, c: u64, d: u64, ) -> u64;
-}
-
-/// Like `println!`, but for kernel-space.
-pub macro uprintln {
-    () => (uprint!("\n")),
-    ($fmt:expr) => (uprint!(concat!($fmt, "\n"))),
-    ($fmt:expr, $($arg:tt)*) => (uprint!(concat!($fmt, "\n"), $($arg)*))
-}
-
-/// Like `print!`, but for kernel-space.
-pub macro uprint($($arg:tt)*) {
-    syscall_print(&format!($($arg)*))
-}
-
-#[no_mangle]
-#[cfg(not(test))]
-pub extern "C" fn el0_main() -> ! {
-    uprintln!("im in a bear suite").unwrap();
-    unsafe { asm!("brk 1" :::: "volatile"); }
-    uprintln!("fuck you shit: {}", 555).unwrap();
-    unsafe { asm!("brk 2" :::: "volatile"); }
-
-    for _ in 0..4 {
-        let v = unsafe { xsvc(111, 222, 333, 444) };
-        uprintln!("fuck you shit: {}", v).unwrap();
-        uprintln!("im in a bear suite").unwrap();
-        unsafe { asm!("brk 3" :::: "volatile"); }
-    }
-
-    use pi::gpio::Gpio;
-
-    let mut led = Gpio::new(16).into_output();
-    let mut motor = Gpio::new(20).into_output();
-    let mut button = Gpio::new(18).into_input();
-
-    loop {
-        let down = !button.level();
-        uprintln!("loop 100_0000").unwrap();
-        pi::common::spin_sleep_cycles(100_0000);
-        //syscall_sleep(1000 * 3);
-
-        if down {
-            motor.set();
-            led.set();
-            pi::timer::spin_sleep_ms(50);
-            motor.clear();
-            led.clear();
-        }
-        //pi::timer::spin_sleep_ms(200);
-    }
-
-    uprintln!("test sleep").unwrap();
-    uprintln!("test sleep: OK").unwrap();
-
-    //shell::shell("user0> ")
-}
-
-#[cfg(not(test))] use traps::Error as SysErr;
-
-#[cfg(not(test))] fn syscall_print(s: &str) -> Result<(), SysErr> {
-    let error: u64;
-    unsafe {
-        asm!("mov x0, $1
-              mov x1, $2
-              svc 2
-              mov $0, x7
-              "
-              : "=r"(error)
-              : "r"(s.as_ptr()), "r"(s.len())
-              : "x0", "x1", "x7"
-              : "volatile")
-    }
-    if error == 0 {
-        Ok(())
-    } else {
-        Err(SysErr::from(error))
-    }
-}
-
-#[cfg(not(test))] fn syscall_sleep(ms: u32) -> Result<(), SysErr> {
-    let error: u64;
-    unsafe {
-        asm!("mov x0, $0
-              svc 1
-              mov $0, x7
-              "
-              : "=r"(error)
-              : "r"(ms)
-              : "x0", "x7"
-              : "volatile");
-    }
-    if error == 0 {
-        Ok(())
-    } else {
-        Err(SysErr::from(error))
-    }
-}
 
 
 #[no_mangle]
@@ -225,8 +125,8 @@ pub extern "C" fn kernel_main() -> ! {
     unsafe {
         ALLOCATOR.initialize();
     }
-    //kprintln!("fs");
-    //FILE_SYSTEM.initialize();
+    kprintln!("fs");
+    FILE_SYSTEM.initialize();
 
 
     test_timers();

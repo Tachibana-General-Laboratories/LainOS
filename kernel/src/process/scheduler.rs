@@ -16,7 +16,8 @@ pub const TICK: u32 = 2 * 1000 * 1000;
 pub struct GlobalScheduler(Mutex<Option<Scheduler>>);
 
 extern "C" {
-    fn el0_main();
+    fn el0_init() -> !;
+    fn el0_other() -> !;
 }
 
 impl GlobalScheduler {
@@ -44,18 +45,15 @@ impl GlobalScheduler {
     /// using timer interrupt based preemptive scheduling. This method should
     /// not return under normal conditions.
     pub fn start(&self) -> ! {
-        let mut process = Process::new().unwrap();
-        process.trap_frame.elr = (el0_main as *const ()) as u64;
+        *self.0.lock().unwrap() = Some(Scheduler::new());
 
         let tf = {
-            let p = &*process.trap_frame;
-            let tf = p as *const TrapFrame as u64;
-            mem::forget(p);
+            let mut init = Process::with_entry(el0_init).unwrap();
+            let tf = init.tf_u64();
+            self.add(init).expect("add proc 'init'");
+            self.add(Process::with_entry(el0_other).unwrap()).expect("add proc 'other'");
             tf
         };
-
-        *self.0.lock().unwrap() = Some(Scheduler::new());
-        self.add(process);
 
         unsafe {
             asm!("
@@ -137,6 +135,8 @@ impl Scheduler {
             }
             self.processes.push_back(process);
         }
+
+        // TODO: improve WFI works
 
         loop {
             for _ in 0..self.processes.len() {

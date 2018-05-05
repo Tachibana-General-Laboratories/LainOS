@@ -43,3 +43,11 @@ pub struct TrapFrame {
     pub x30: u64, // lr
     pub x0: u64,
 }
+
+impl TrapFrame {
+    pub fn set_elr(&mut self, entry: unsafe extern "C" fn () -> !) {
+        let entry = entry as *const u8 as u64;
+        assert_eq!(entry % 4, 0, "PC must be proprely aligned");
+        self.elr = entry;
+    }
+}

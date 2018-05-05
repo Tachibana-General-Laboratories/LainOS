@@ -32,6 +32,19 @@ impl Process {
             Self { trap_frame, stack, state }
         })
     }
+    pub fn with_entry(entry: unsafe extern "C" fn () -> !) -> Option<Self> {
+        Self::new().map(|mut p| {
+            p.trap_frame.set_elr(entry);
+            p
+        })
+    }
+
+    pub fn tf_u64(&mut self) -> u64 {
+        let p = &*self.trap_frame;
+        let tf = p as *const TrapFrame as u64;
+        mem::forget(p);
+        tf
+    }
 
     /// Returns `true` if this process is ready to be scheduled.
     ///
@@ -48,21 +61,19 @@ impl Process {
     ///
     /// Returns `false` in all other cases.
     pub fn is_ready(&mut self) -> bool {
-        let p = self as *mut Self;
-        let ret = match self.state {
+        let state = mem::replace(&mut self.state, State::Ready);
+        match state {
             State::Ready => true,
-            State::Running => false,
-            State::Waiting(ref mut f) => {
-                let p = unsafe { &mut *p };
-                let r = f(p);
-                mem::forget(p);
-                r
+            State::Running => {
+                mem::replace(&mut self.state, State::Running);
+                false
             }
-        };
-        if ret {
-            self.state = State::Ready;
+            State::Waiting(mut f) => {
+                let ret = f(self);
+                mem::replace(&mut self.state, State::Waiting(f));
+                ret
+            }
         }
-        ret
     }
 
     pub fn set_id(&mut self, id: Option<Id>) {
