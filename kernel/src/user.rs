@@ -1,6 +1,7 @@
 use core::fmt::{self, Write};
-use pi;
 use pi::gpio::Gpio;
+
+use traps::Error as SysErr;
 
 struct Stdout;
 
@@ -23,16 +24,14 @@ pub macro print($($arg:tt)*) {
 }
 
 #[no_mangle]
-#[cfg(not(test))]
 pub extern "C" fn el0_other() -> ! {
     loop {
         println!("i'm 2");
-        syscall_sleep(10000);
+        syscall_sleep(10 * 1000).unwrap();
     }
 }
 
 #[no_mangle]
-#[cfg(not(test))]
 pub extern "C" fn el0_init() -> ! {
     println!("im in a bear suite");
     unsafe { asm!("brk 1" :::: "volatile"); }
@@ -43,31 +42,32 @@ pub extern "C" fn el0_init() -> ! {
     let mut motor = Gpio::new(20).into_output();
     let mut button = Gpio::new(18).into_input();
 
+    let mut state = false;
+
     loop {
         let down = !button.level();
-        println!("loop 100_0000");
-        pi::common::spin_sleep_cycles(100_0000);
-        //syscall_sleep(1000 * 3);
+        println!("loop with sleep: {}", down);
 
-        if down {
+        state = down && !state;
+
+        if state {
             motor.set();
             led.set();
-            pi::timer::spin_sleep_ms(50);
+            syscall_sleep(50).unwrap();
+            motor.clear();
+            led.clear();
+            syscall_sleep(50).unwrap();
+        } else {
             motor.clear();
             led.clear();
         }
-        //pi::timer::spin_sleep_ms(200);
     }
-
-    println!("test sleep");
-    println!("test sleep: OK");
 
     //shell::shell("user0> ")
 }
 
-#[cfg(not(test))] use traps::Error as SysErr;
 
-#[cfg(not(test))] fn syscall_print(s: &str) -> Result<(), SysErr> {
+fn syscall_print(s: &str) -> Result<(), SysErr> {
     let error: u64;
     unsafe {
         asm!("mov x0, $1
@@ -87,7 +87,7 @@ pub extern "C" fn el0_init() -> ! {
     }
 }
 
-#[cfg(not(test))] fn syscall_sleep(ms: u32) -> Result<(), SysErr> {
+fn syscall_sleep(ms: u32) -> Result<(), SysErr> {
     let error: u64;
     unsafe {
         asm!("mov x0, $1

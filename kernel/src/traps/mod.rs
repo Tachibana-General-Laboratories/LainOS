@@ -50,28 +50,32 @@ pub extern fn handle_exception(info: Info, esr: u32, tf: &mut TrapFrame) {
 
     let syndrome = Syndrome::from(esr as u32);
     let ctl = Controller::new();
-    match (info.kind, info.source, syndrome) {
+    if info.source == LowerAArch64 {
+        match info.kind {
+            Synchronous => {
+                match syndrome {
+                    Syndrome::Svc(num) => return handle_syscall(num, tf),
+                    Syndrome::Brk(num) => {
+                        kprintln!("--- BRK {:?} at {:08X}", num, tf.elr);
+                        tf.elr += 4;
+                        return;
+                    }
+                    _ => (),
+                }
+            }
 
-        (Synchronous, LowerAArch64, Syndrome::Svc(num)) => {
-            handle_syscall(num, tf);
-            return;
+            Irq if ctl.is_pending(Timer1) => return handle_irq(Timer1, tf),
+            Irq if ctl.is_pending(Timer3) => return handle_irq(Timer3, tf),
+            Irq if ctl.is_pending(Usb   ) => return handle_irq(Usb   , tf),
+            Irq if ctl.is_pending(Gpio0 ) => return handle_irq(Gpio0 , tf),
+            Irq if ctl.is_pending(Gpio1 ) => return handle_irq(Gpio1 , tf),
+            Irq if ctl.is_pending(Gpio2 ) => return handle_irq(Gpio2 , tf),
+            Irq if ctl.is_pending(Gpio3 ) => return handle_irq(Gpio3 , tf),
+            Irq if ctl.is_pending(Uart  ) => return handle_irq(Uart  , tf),
+
+            _ => (),
         }
-
-        (Synchronous, LowerAArch64, Syndrome::Brk(num)) => {
-            kprintln!("--- BRK {:?} at {:08X}", num, tf.elr);
-            tf.elr += 4;
-            return;
-        }
-
-        (Irq, LowerAArch64, _) if ctl.is_pending(Timer1) => return handle_irq(Timer1, tf),
-        (Irq, LowerAArch64, _) if ctl.is_pending(Timer3) => return handle_irq(Timer3, tf),
-        (Irq, LowerAArch64, _) if ctl.is_pending(Usb   ) => return handle_irq(Usb   , tf),
-        (Irq, LowerAArch64, _) if ctl.is_pending(Gpio0 ) => return handle_irq(Gpio0 , tf),
-        (Irq, LowerAArch64, _) if ctl.is_pending(Gpio1 ) => return handle_irq(Gpio1 , tf),
-        (Irq, LowerAArch64, _) if ctl.is_pending(Gpio2 ) => return handle_irq(Gpio2 , tf),
-        (Irq, LowerAArch64, _) if ctl.is_pending(Gpio3 ) => return handle_irq(Gpio3 , tf),
-        (Irq, LowerAArch64, _) if ctl.is_pending(Uart  ) => return handle_irq(Uart  , tf),
-
-        _ => panic!("IT'S A TRAP: {:?} {:?} {:?}", info, syndrome, tf),
     }
+
+    panic!("IT'S A TRAP: {:?} {:?} {:?}", info, syndrome, tf);
 }

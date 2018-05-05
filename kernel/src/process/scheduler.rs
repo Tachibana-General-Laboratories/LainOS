@@ -1,5 +1,4 @@
 use alloc::VecDeque;
-use core::num::NonZeroU64;
 use core::mem;
 
 use sys::Mutex;
@@ -8,8 +7,7 @@ use traps::TrapFrame;
 use aarch64::wait_for_interrupt;
 
 /// The `tick` time.
-// FIXME: When you're ready, change this to something more reasonable.
-pub const TICK: u32 = 2 * 1000 * 1000;
+pub const TICK: u32 = 10 * 1000;
 
 /// Process scheduler for the entire machine.
 #[derive(Debug)]
@@ -99,19 +97,16 @@ impl Scheduler {
     /// is called, that process is executing on the CPU.
     fn add(&mut self, mut process: Process) -> Option<Id> {
          let id = match self.last_id {
-            Some(id) => {
-                let id = id.get().checked_add(1)?;
-                unsafe { NonZeroU64::new_unchecked(id) }
-            }
+            Some(id) => id.next()?,
             None => {
-                let id = unsafe { NonZeroU64::new_unchecked(1) };
+                let id = Id::one();
                 process.state = State::Running;
                 self.current = Some(id);
                 id
             }
         };
 
-        process.trap_frame.tpidr = id.get();
+        process.trap_frame.tpidr = id.as_u64();
         self.processes.push_back(process);
 
         self.last_id = Some(id);
@@ -127,6 +122,10 @@ impl Scheduler {
     /// This method blocks until there is a process to switch to, conserving
     /// energy as much as possible in the interim.
     fn switch(&mut self, new_state: State, tf: &mut TrapFrame) -> Option<Id> {
+        if self.current.is_none() {
+            return None;
+        }
+
         if let Some(mut process) = self.processes.pop_front() {
             if process.id() == self.current {
                 *process.trap_frame = *tf;
@@ -154,6 +153,5 @@ impl Scheduler {
             }
             wait_for_interrupt();
         }
-        None
     }
 }

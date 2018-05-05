@@ -1,11 +1,40 @@
-use core::mem;
+use core::{mem, fmt};
 use core::num::NonZeroU64;
 use traps::TrapFrame;
 use process::{State, Stack};
 use alloc::boxed::Box;
 
 /// Type alias for the type of a process ID.
-pub type Id = NonZeroU64;
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub struct Id {
+    id: NonZeroU64,
+}
+
+impl Id {
+    pub fn one() -> Self {
+        Self { id: unsafe { NonZeroU64::new_unchecked(1) } }
+    }
+
+    pub fn new(id: u64) -> Option<Self> {
+        Some(Self { id: NonZeroU64::new(id)? })
+    }
+
+    pub fn next(self) -> Option<Self> {
+        let id = self.id.get().checked_add(1)?;
+        let id = unsafe { NonZeroU64::new_unchecked(id) };
+        Some(Self { id })
+    }
+
+    pub fn as_u64(self) -> u64 {
+        self.id.get()
+    }
+}
+
+impl fmt::Debug for Id {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "Id({})", self.id.get())
+    }
+}
 
 /// A structure that represents the complete state of a process.
 #[derive(Debug)]
@@ -78,13 +107,13 @@ impl Process {
 
     pub fn set_id(&mut self, id: Option<Id>) {
         if let Some(id) = id {
-            self.trap_frame.tpidr = id.get();
+            self.trap_frame.tpidr = id.as_u64();
         } else {
             self.trap_frame.tpidr = 0;
         }
     }
 
     pub fn id(&self) -> Option<Id> {
-        NonZeroU64::new(self.trap_frame.tpidr)
+        Id::new(self.trap_frame.tpidr)
     }
 }

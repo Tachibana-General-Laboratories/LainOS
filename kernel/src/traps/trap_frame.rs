@@ -1,3 +1,5 @@
+pub type EntryFn = unsafe extern "C" fn () -> !;
+
 #[repr(C)]
 #[derive(Default, Debug, Copy, Clone)]
 pub struct TrapFrame {
@@ -45,7 +47,7 @@ pub struct TrapFrame {
 }
 
 impl TrapFrame {
-    pub fn set_elr(&mut self, entry: unsafe extern "C" fn () -> !) {
+    pub fn set_elr(&mut self, entry: EntryFn) {
         let entry = entry as *const u8 as u64;
         assert_eq!(entry % 4, 0, "PC must be proprely aligned");
         self.elr = entry;

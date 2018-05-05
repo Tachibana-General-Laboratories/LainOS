@@ -20,6 +20,29 @@ pub enum State {
     Running,
 }
 
+impl State {
+    pub fn is_ready(&self) -> bool {
+        match self {
+            State::Ready => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_waiting(&self) -> bool {
+        match self {
+            State::Waiting(_) => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_running(&self) -> bool {
+        match self {
+            State::Running => true,
+            _ => false,
+        }
+    }
+}
+
 impl fmt::Debug for State {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
