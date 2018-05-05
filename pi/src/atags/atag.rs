@@ -58,7 +58,7 @@ impl<'a> From<&'a raw::Mem> for Atag {
 impl<'a> From<&'a raw::Cmd> for Atag {
     fn from(cmd: &raw::Cmd) -> Atag {
         let cmd = unsafe {
-            let p = cmd.cmd as *const u8;
+            let p = (&cmd.cmd) as *const u8;
             let mut size = 0;
             while *p.add(size) != 0 {
                 size += 1;
