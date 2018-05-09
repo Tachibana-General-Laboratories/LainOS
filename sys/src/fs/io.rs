@@ -1,4 +1,4 @@
-use alloc::String;
+use alloc::string::{String, ToString};
 use core::result;
 
 pub type Result<T> = result::Result<T, Error>;
@@ -99,6 +99,22 @@ pub enum SeekFrom {
 
 pub trait Read {
     fn read(&mut self, buf: &mut [u8]) -> Result<usize>;
+
+    fn read_exact(&mut self, mut buf: &mut [u8]) -> Result<()> {
+        while !buf.is_empty() {
+            match self.read(buf) {
+                Ok(0) => break,
+                Ok(n) => { let tmp = buf; buf = &mut tmp[n..]; }
+                Err(Error::Interrupted(_)) => {}
+                Err(e) => return Err(e),
+            }
+        }
+        if !buf.is_empty() {
+            Err(Error::UnexpectedEof("failed to fill whole buffer".to_string()))
+        } else {
+            Ok(())
+        }
+    }
 }
 
 pub trait Write {

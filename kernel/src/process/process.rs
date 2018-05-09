@@ -97,6 +97,10 @@ impl Process {
                 mem::replace(&mut self.state, State::Running);
                 false
             }
+            State::Exit(code) => {
+                mem::replace(&mut self.state, State::Exit(code));
+                false
+            }
             State::Waiting(mut f) => {
                 let ret = f(self);
                 mem::replace(&mut self.state, State::Waiting(f));

@@ -5,7 +5,6 @@ version = "0.1.0"
 [dependencies]
 #spin = "*"
 #slab_allocator = "0.3.0"
-#bitflags = "1"
 
 sys_fs = { path = "../sys_fs" }
 sys = { path = "../sys" }
@@ -13,6 +12,13 @@ pi = { path = "../pi", features = [] }
 #pi = { path = "../pi" }
 
 #log = { version = "0.4", features = ["max_level_trace", "release_max_level_warn"] }
+
+
+[dependencies.bitflags]
+version = "1"
+
+[dependencies.cloudabi]
+version = "0.0.3"
 
 [lib]
 crate-type = ["staticlib"]

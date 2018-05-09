@@ -143,6 +143,26 @@ impl MiniUart {
         self.registers.IO.read()
     }
 
+    pub fn write_buf(&mut self, buf: &[u8]) {
+        for &b in buf {
+            self.write_byte(b);
+        }
+    }
+
+    pub fn read_buf(&mut self, buf: &mut [u8]) -> Option<usize> {
+        if self.wait_for_byte().is_err() {
+            return None;
+        }
+        let mut count = 0;
+        for b in buf.iter_mut() {
+            if !self.has_byte() {
+                break;
+            }
+            *b = self.read_byte();
+            count += 1;
+        }
+        Some(count)
+    }
 }
 
 // FIXME: Implement `fmt::Write` for `MiniUart`. A b'\r' byte should be written

@@ -15,10 +15,11 @@
 #![feature(ptr_internals)]
 #![feature(nonzero)]
 
-#![no_std]
 
-//#[macro_use]
-//extern crate bitflags;
+#![cfg_attr(not(test), no_std)]
+
+#[macro_use]
+extern crate bitflags;
 
 //extern crate core;
 #[macro_use]
@@ -27,8 +28,7 @@ extern crate alloc;
 //extern crate spin;
 
 #[cfg(not(test))] extern crate sys;
-//#[cfg(not(test))]
-extern crate pi;
+#[cfg(not(test))] extern crate pi;
 #[cfg(not(test))] extern crate sys_fs as fat32;
 
 
@@ -37,27 +37,21 @@ extern crate pi;
 extern crate log;
 */
 
+pub mod console;
+pub mod elf;
 
 #[cfg(not(test))] pub mod aarch64;
 #[cfg(not(test))] pub mod process;
 #[cfg(not(test))] pub mod traps;
 #[cfg(not(test))] pub mod vm;
-
-pub mod console;
-
 #[cfg(not(test))] pub mod panic;
-//#[cfg(not(test))] pub mod mmu;
-
+#[cfg(not(test))] pub mod mmu;
 #[cfg(not(test))] pub mod fb;
-//#[cfg(not(test))] pub mod shell;
+#[cfg(not(test))] pub mod user;
 
 //pub mod sd;
 //pub mod sdn;
 //pub mod gles;
-//
-#[cfg(not(test))] pub mod user;
-
-
 #[cfg(not(test))] pub mod fs;
 pub mod allocator;
 
@@ -68,7 +62,7 @@ pub mod allocator;
 #[cfg(not(test))] use process::GlobalScheduler;
 
 #[global_allocator]
-#[cfg(not(test))] pub static mut ALLOCATOR: Allocator = Allocator::uninitialized();
+#[cfg(not(test))] pub static ALLOCATOR: Allocator = Allocator::uninitialized();
 #[cfg(not(test))] pub static FILE_SYSTEM: FileSystem = FileSystem::uninitialized();
 #[cfg(not(test))] pub static SCHEDULER: GlobalScheduler = GlobalScheduler::uninitialized();
 
@@ -94,42 +88,50 @@ const ADDR_2GB: usize   = 0x8000_0000;
 pub extern "C" fn kernel_main() -> ! {
     // hello blink
     {
-        let mut pin = pi::gpio::Gpio::new(16).into_output();
+        use pi::gpio::Gpio;
+        use pi::timer::spin_sleep_ms;
+        let mut pin = Gpio::new(16).into_output();
         pin.set();
-        pi::timer::spin_sleep_ms(500);
+        spin_sleep_ms(500);
         pin.clear();
-        pi::timer::spin_sleep_ms(500);
+        spin_sleep_ms(500);
         pin.set();
     }
 
     let el = unsafe { aarch64::current_el() };
     let cpuid = unsafe { aarch64::affinity() };
-    kprintln!("start kernel main at [CPU{} EL{}]", cpuid, el);
+    kprintln!("-------------------------------");
+    kprintln!("Start KERNEL main at [CPU{} EL{}]", cpuid, el);
+    kprintln!("-------------------------------");
+    kprintln!();
 
-    for atag in pi::atags::Atags::get() {
-        kprintln!("Atag: {:?}", atag);
-    }
+
+    print_atags();
+
+    kprintln!("{:?}", aarch64::AArch64::new());
+    kprintln!("MAIR_EL1: {:?}", aarch64::MemoryAttributeIndirectionRegister::el1());
 
     /*
     init_logger().unwrap();
     info!("test logger");
     */
 
-    /*
     kprintln!("initialize mmu");
     unsafe { mmu::init_mmu(); }
-    */
 
 
-    kprintln!("allocator");
-    unsafe {
+    {
+        kprint!("allocator init: ");
         ALLOCATOR.initialize();
+        kprintln!("OK");
+
+        kprint!("file system init: ");
+        FILE_SYSTEM.initialize();
+        kprintln!("OK");
     }
-    kprintln!("fs");
-    FILE_SYSTEM.initialize();
 
 
-    test_timers();
+    //test_timers();
 
     //init_fb(480, 320);
     //init_fb(1920, 1080);
@@ -137,16 +139,39 @@ pub extern "C" fn kernel_main() -> ! {
 
     //shell::shell("kernel> ");
 
-    kprintln!("EL0:");
+    {
+        kprintln!("---- EL0: ----");
 
-    use pi::interrupt::{Controller, Interrupt};
-    use pi::timer::tick_in;
+        use pi::interrupt::{Controller, Interrupt};
+        use pi::timer::tick_in;
 
-    Controller::new().enable(Interrupt::Timer1);
-    tick_in(process::TICK);
+        Controller::new().enable(Interrupt::Timer1);
+        tick_in(process::TICK);
 
-    SCHEDULER.start()
+        SCHEDULER.start()
+    }
 }
+
+
+#[cfg(not(test))]
+fn print_atags() {
+    use pi::atags::*;
+    for atag in Atags::get() {
+        match atag {
+            Atag::Mem(Mem { start, size }) => {
+                kprintln!("Atag::Mem {:#016X}-{:#016X} [size: {:#X}]", start, start + size, size);
+            }
+            Atag::Cmd(s) => {
+                kprintln!("Atag::Cmd:");
+                for s in s.split_terminator(' ') {
+                    kprintln!("  {}", s);
+                }
+            }
+            _ => kprintln!("Atag: {:?}", atag),
+        }
+    }
+}
+
 
 #[cfg(not(test))]
 fn init_fb(w: u32, h: u32) {

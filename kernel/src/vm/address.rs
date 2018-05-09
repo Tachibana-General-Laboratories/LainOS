@@ -1,9 +1,11 @@
 use core::fmt;
 
 /// A virtual address.
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct VirtualAddr(usize);
 
 /// A physical address.
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct PhysicalAddr(usize);
 
 macro_rules! impl_for {
@@ -45,7 +47,7 @@ macro_rules! impl_for {
 
         impl fmt::Debug for $T {
             fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-                write!(f, "{}({:#x})", stringify!($T), self.0)
+                write!(f, "{}({:#016X})", stringify!($T), self.0)
             }
         }
     }

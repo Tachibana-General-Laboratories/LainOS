@@ -73,6 +73,20 @@ pub fn print(s: *const u8, len: usize) -> Result<(), Error> {
         .map_err(|_| Error::Io)
 }
 
+pub fn read_byte() -> Result<u8, Error> {
+    let mut c = CONSOLE.lock().unwrap();
+    if c.has_byte() {
+        Ok(c.read_byte())
+    } else {
+        Ok(0)
+    }
+}
+
+pub fn exit(code: u32, tf: &mut TrapFrame) {
+    kprintln!("EXIT: {}", code);
+    SCHEDULER.switch(State::Exit(code), tf).expect("exit");
+}
+
 pub fn handle_syscall(num: u16, tf: &mut TrapFrame) {
     tf.x7 = 0;
     match num {
@@ -80,6 +94,13 @@ pub fn handle_syscall(num: u16, tf: &mut TrapFrame) {
         2 => {
             if let Err(err) = print(tf.x0 as *const u8, tf.x1 as usize) {
                 tf.x7 = err as u64;
+            }
+        }
+        3 => exit(tf.x0 as u32, tf),
+        4 => {
+            match read_byte() {
+                Ok(byte) => tf.x0 = byte as u64,
+                Err(err) => tf.x7 = err as u64,
             }
         }
         _ => {

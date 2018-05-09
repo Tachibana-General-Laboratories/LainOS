@@ -1,5 +1,5 @@
-mod linked_list;
-mod util;
+pub mod linked_list;
+pub mod util;
 
 #[path = "bin.rs"]
 mod imp;
@@ -8,11 +8,9 @@ mod imp;
 mod tests;
 
 use sys::Mutex;
+use pi::atags::Atags;
 use core::alloc::{Alloc, GlobalAlloc, AllocErr, Layout, Opaque};
 use core::ptr::NonNull;
-
-use console::kprintln;
-use pi::atags::Atags;
 
 /// Thread-safe (locking) wrapper around a particular memory allocator.
 #[derive(Debug)]
@@ -112,11 +110,9 @@ fn memory_map() -> Option<(usize, usize)> {
     let start = util::align_up(binary_end as usize, MIN_HEAP_SIZE);
 
     let end = Atags::get()
-        .inspect(|t| kprintln!("found atag: {:?}", t))
         .filter_map(|t| t.mem())
         .map(|t| (t.start + t.size) as usize)
         .max()
         .unwrap_or(0x4000_0000);
-    kprintln!("end of mem: 0x{:x}", end);
     Some((start, end))
 }

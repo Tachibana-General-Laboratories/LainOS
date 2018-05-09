@@ -16,6 +16,7 @@ pub struct GlobalScheduler(Mutex<Option<Scheduler>>);
 extern "C" {
     fn el0_init() -> !;
     fn el0_other() -> !;
+    fn el0_shell() -> !;
 }
 
 impl GlobalScheduler {
@@ -50,6 +51,7 @@ impl GlobalScheduler {
             let tf = init.tf_u64();
             self.add(init).expect("add proc 'init'");
             self.add(Process::with_entry(el0_other).unwrap()).expect("add proc 'other'");
+            self.add(Process::with_entry(el0_shell).unwrap()).expect("add proc 'shell'");
             tf
         };
 
@@ -127,12 +129,17 @@ impl Scheduler {
         }
 
         if let Some(mut process) = self.processes.pop_front() {
+            let is_exit = new_state.is_exit();
             if process.id() == self.current {
                 *process.trap_frame = *tf;
                 process.state = new_state;
                 self.current = None;
+                if !is_exit {
+                    self.processes.push_back(process);
+                }
+            } else {
+                self.processes.push_front(process);
             }
-            self.processes.push_back(process);
         }
 
         // TODO: improve WFI works

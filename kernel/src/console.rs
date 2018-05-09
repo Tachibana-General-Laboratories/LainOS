@@ -42,6 +42,18 @@ impl Console {
     pub fn write_byte(&mut self, byte: u8) {
         self.inner().write_byte(byte)
     }
+
+    pub fn has_byte(&mut self) -> bool {
+        self.inner().has_byte()
+    }
+
+    pub fn write_buf(&mut self, buf: &[u8]) {
+        self.inner().write_buf(buf)
+    }
+
+    pub fn read_buf(&mut self, buf: &mut [u8]) -> Option<usize> {
+        self.inner().read_buf(buf)
+    }
 }
 
 /*

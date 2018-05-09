@@ -34,9 +34,7 @@ setup:
     and     x6, x6, #0b1100
     lsr     x6, x6, #2
 
-    ldr     x8, =_stack_core0_el0
     ldr     x9, =_stack_core0_el1
-    ldr     x10, =_stack_core0_el2
 
 switch_to_el2:
     // switch to EL2 if we're in EL3. otherwise switch to EL1
@@ -75,7 +73,7 @@ switch_to_el1:
     msr     SP_EL1, x9
 
     // set the stack-pointer for EL2
-    mov     SP    , x10
+    //mov     SP    , x10
 
     // enable CNTP for EL1/EL0 (ref: D7.5.2, D7.5.13)
     // NOTE: This doesn't actually enable the counter stream.
@@ -113,7 +111,6 @@ switch_to_el1:
     eret
 
 set_stack:
-    msr     SP_EL0, x8
     mov     SP    , x9
 
 zero_bss:

@@ -18,6 +18,8 @@ pub enum State {
     Waiting(EventPollFn),
     /// The process is currently running.
     Running,
+    /// The process is exiting.
+    Exit(u32),
 }
 
 impl State {
@@ -41,6 +43,13 @@ impl State {
             _ => false,
         }
     }
+
+    pub fn is_exit(&self) -> bool {
+        match self {
+            State::Exit(_) => true,
+            _ => false,
+        }
+    }
 }
 
 impl fmt::Debug for State {
@@ -49,6 +58,7 @@ impl fmt::Debug for State {
             State::Ready => write!(f, "State::Ready"),
             State::Running => write!(f, "State::Running"),
             State::Waiting(_) => write!(f, "State::Waiting"),
+            State::Exit(code) => write!(f, "State::Exit({})", code),
         }
     }
 }

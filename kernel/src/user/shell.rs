@@ -1,15 +1,23 @@
 use sys::StackVec;
 use core::str::from_utf8;
+use core::str::FromStr;
+
+use super::syscall::*;
 
 //use pi::power;
-use console::{kprint, kprintln, CONSOLE};
+use console::CONSOLE;
 
-use std::io;
+//use std::io;
 
-use std::path::{Path, PathBuf};
+//use std::path::{Path, PathBuf};
 
 use FILE_SYSTEM;
-use sys::fs::*;
+//use sys::fs::*;
+//
+
+fn read_byte() -> u8 {
+    syscall_read_byte().unwrap()
+}
 
 /// Error type for `Command` parse failures.
 #[derive(Debug)]
@@ -50,61 +58,68 @@ impl<'a> Command<'a> {
 
 /// Starts a shell using `prefix` as the prefix for each line. This function
 /// never returns: it is perpetually in a shell loop.
-pub fn shell(prefix: &str) -> ! {
-    use std::io::Write;
+pub fn shell(prefix: &str) -> u32 {
+    //use std::io::Write;
 
-    kprintln!("      .  ");
-    kprintln!("    < 0 >");
-    kprintln!("    ./ \\.");
-    kprintln!("");
+    println!("");
+    println!("      .  ");
+    println!("    < 0 >");
+    println!("    ./ \\.");
+    println!("");
 
-    kprint!("(/) {}", prefix);
+    //print!("(/) {}", prefix);
+    print!("{}", prefix);
 
-    let mut shell = Shell { cwd: PathBuf::from("/") };
+    //let mut shell = Shell { cwd: PathBuf::from("/") };
+    let mut shell = Shell { exit: None };
 
     let mut buf = [0u8; 512];
     let mut buf = StackVec::new(&mut buf);
-    loop {
-        let byte = CONSOLE.lock().read_byte();
+    while shell.exit.is_none() {
+        let byte = read_byte();
         match byte {
             0 => (),
             b'\r' | b'\n' => {
-                kprint!("\r\n");
+                print!("\r\n");
                 {
                     let s = from_utf8(&buf).unwrap();
                     let mut str_buf = [""; 64];
                     match Command::parse(s, &mut str_buf) {
                         Err(Error::Empty) => (),
-                        Err(Error::TooManyArgs) => kprintln!("error: too many arguments"),
+                        Err(Error::TooManyArgs) => println!("error: too many arguments"),
                         Ok(cmd) => shell.run(cmd),
                     }
                 }
                 buf.truncate(0);
-                let cwd = shell.cwd.to_str().unwrap();
-                kprint!("({}) {}", cwd, prefix);
+                print!("{}", prefix);
+                //let cwd = shell.cwd.to_str().unwrap();
+                //print!("({}) {}", cwd, prefix);
             }
             127 | 8 => { // DEL | BS
                 if !buf.is_empty() {
-                    CONSOLE.lock().write(&[8, 32, 8]).unwrap();
+                    write_buf(&[8, 32, 8]);
                     buf.pop();
                 }
             }
             c @ 32...126 => {
                 if !buf.is_full() {
                     buf.push(c).unwrap();
-                    CONSOLE.lock().write(&[c]).unwrap();
+                    write_buf(&[c]);
                 }
             }
             _ => {
                 // send bell
-                CONSOLE.lock().write(&[7]).unwrap();
+                write_buf(&[7]);
             }
         }
     }
+
+    shell.exit.unwrap()
 }
 
 struct Shell {
-    cwd: PathBuf,
+    //cwd: PathBuf,
+    exit: Option<u32>,
 }
 
 impl Shell {
@@ -112,33 +127,43 @@ impl Shell {
         match cmd.path() {
             "echo" => {
                 self.echo(cmd.args);
-                kprint!("\r\n");
+                print!("\r\n");
             }
+            "exit" => {
+                let code: u32 = cmd.args.get(1)
+                    .and_then(|s| u32::from_str(s).ok())
+                    .unwrap_or(0);
+                self.exit = Some(code);
+                print!("\r\n");
+            }
+            /*
             "pwd" => {
-                kprint!("{}", self.cwd.to_str().unwrap());
-                kprint!("\r\n");
+                print!("{}", self.cwd.to_str().unwrap());
+                print!("\r\n");
             }
             "cd" => self.cd(cmd.args),
             "ls" => self.ls(cmd.args),
             "cat" => self.cat(cmd.args),
+            */
 
             /*
             "poweroff" => {
-                kprintln!("power-off the machine");
+                println!("power-off the machine");
                 power::power_off();
             }
             "halt" => {
-                kprintln!("halt the machine");
+                println!("halt the machine");
                 power::halt();
             }
             "reset" => {
-                kprintln!("reset the machine");
+                println!("reset the machine");
                 power::reset();
             }
             */
-            _ => kprintln!("unknown command: {}", cmd.path()),
+            _ => println!("unknown command: {}", cmd.path()),
         }
     }
+    /*
 
     fn canonicalize<P: AsRef<Path>>(&self, p: P) -> io::Result<PathBuf> {
         use std::path::Component::*;
@@ -167,17 +192,19 @@ impl Shell {
 
         Ok(result)
     }
+    */
 
     fn echo(&self, args: StackVec<&str>) {
         for (i, arg) in args.iter().enumerate() {
             match i {
                 0 => (),
-                1 => kprint!("{}", arg),
-                _ => kprint!(" {}", arg),
+                1 => print!("{}", arg),
+                _ => print!(" {}", arg),
             }
         }
     }
 
+    /*
     fn cd(&mut self, args: StackVec<&str>) {
         if args.len() == 1 {
             self.cwd = PathBuf::from("/");
@@ -188,7 +215,7 @@ impl Shell {
                 .and_then(|dir| FILE_SYSTEM.open_dir(&dir).map(|_| dir));
             match dir {
                 Ok(dir) => self.cwd = dir,
-                Err(err) => kprintln!("cd: {:?}", err),
+                Err(err) => println!("cd: {:?}", err),
             }
         }
     }
@@ -201,10 +228,10 @@ impl Shell {
         match FILE_SYSTEM.open_dir(&dir).and_then(|e| e.entries()) {
             Ok(entries) => {
                 for e in entries {
-                    kprintln!("{}", e.name());
+                    println!("{}", e.name());
                 }
             }
-            Err(err) => kprintln!("ls: {}", err),
+            Err(err) => println!("ls: {}", err),
         }
     }
 
@@ -220,8 +247,9 @@ impl Shell {
                     let mut w = CONSOLE.lock();
                     io::copy(&mut r, &mut *w).unwrap();
                 }
-                Err(err) => kprintln!("cat: {}", err),
+                Err(err) => println!("cat: {}", err),
             }
         }
     }
+    */
 }

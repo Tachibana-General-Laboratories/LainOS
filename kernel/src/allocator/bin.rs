@@ -1,3 +1,4 @@
+use core::mem;
 use core::alloc::{AllocErr, Layout, Opaque};
 use core::ptr::NonNull;
 
@@ -23,6 +24,17 @@ impl Allocator {
             bin: [LinkedList::new(); BIN_COUNT],
             current: start,
             end,
+        }
+    }
+
+    fn recycle(&mut self, mut ptr: usize, mut size: usize) {
+        for i in (0..BIN_COUNT).rev() {
+            let bin = 2usize.pow(3 + i as u32);
+            while size % bin != 0 {
+                unsafe { self.bin[i].push(ptr as *mut usize); }
+                size -= bin;
+                ptr -= bin;
+            }
         }
     }
 
@@ -54,20 +66,21 @@ impl Allocator {
             return Err(AllocErr);
         }
 
-        let bin = &mut self.bin[bin - 3];
-
-        if let Some(addr) = bin.pop() {
+        if let Some(addr) = self.bin[bin - 3].pop() {
             let addr = align_up(addr as usize, layout.align());
             unsafe { Ok(NonNull::new_unchecked(addr as *mut u8).as_opaque()) }
         } else {
             let start = align_up(self.current, layout.align());
             let end = start + layout.size();
+
             if end >= self.end {
-                Err(AllocErr)
-            } else {
-                self.current = end;
-                unsafe { Ok(NonNull::new_unchecked(start as *mut u8).as_opaque()) }
+                return Err(AllocErr);
             }
+
+            let ptr = mem::replace(&mut self.current, end);
+            self.recycle(ptr, start - ptr);
+
+            unsafe { Ok(NonNull::new_unchecked(start as *mut u8).as_opaque()) }
         }
     }
 
