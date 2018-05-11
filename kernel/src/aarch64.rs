@@ -245,13 +245,13 @@ impl fmt::Debug for AArch64 {
 
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum PhysicalAddressRange {
-    R32, // 32 bits, 4GB
-    R36, // 36 bits, 64GB
-    R40, // 40 bits, 1TB
-    R42, // 42 bits, 4TB
-    R44, // 44 bits, 16TB
-    R48, // 48 bits, 256TB
-    R52, // 52 bits, 4PB (only in ARMv8.2-LPA)
+    R32 = 0b0000, // 32 bits, 4GB
+    R36 = 0b0001, // 36 bits, 64GB
+    R40 = 0b0010, // 40 bits, 1TB
+    R42 = 0b0011, // 42 bits, 4TB
+    R44 = 0b0100, // 44 bits, 16TB
+    R48 = 0b0101, // 48 bits, 256TB
+    R52 = 0b0110, // 52 bits, 4PB (only in ARMv8.2-LPA)
 }
 
 impl PhysicalAddressRange {

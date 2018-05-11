@@ -2,10 +2,9 @@ pub mod sd;
 
 use core::ops::Deref;
 
-pub use sys::fs;
-use sys::fs::io;
-
-use fat32::vfat::{self, Shared, VFat};
+use vfat::{traits, io};
+use vfat::path::Path;
+use vfat::vfat::{self, Shared, VFat};
 
 use sys::Mutex;
 use self::sd::Sd;
@@ -33,40 +32,40 @@ impl FileSystem {
     }
 }
 
-impl<'a> fs::FileSystem for &'a FileSystem {
+impl<'a> traits::FileSystem for &'a FileSystem {
     type File = vfat::File;
     type Dir = vfat::Dir;
     type Entry = vfat::Entry;
 
-    fn open(self, path: &str) -> io::Result<Self::Entry> {
+    fn open<P: AsRef<Path>>(self, path: P) -> io::Result<Self::Entry> {
         match self.0.lock().unwrap().deref() {
             &Some(ref vfat) => vfat.open(path),
             &None => panic!("uninitialized"),
         }
     }
 
-    fn create_file(self, path: &str) -> io::Result<Self::File> {
+    fn create_file<P: AsRef<Path>>(self, path: P) -> io::Result<Self::File> {
         match self.0.lock().unwrap().deref() {
             &Some(ref vfat) => vfat.create_file(path),
             &None => panic!("uninitialized"),
         }
     }
 
-    fn create_dir(self, path: &str, parents: bool) -> io::Result<Self::Dir> {
+    fn create_dir<P: AsRef<Path>>(self, path: P, parents: bool) -> io::Result<Self::Dir> {
         match self.0.lock().unwrap().deref() {
             &Some(ref vfat) => vfat.create_dir(path, parents),
             &None => panic!("uninitialized"),
         }
     }
 
-    fn rename(self, from: &str, to: &str) -> io::Result<()> {
+    fn rename<P: AsRef<Path>, Q: AsRef<Path>>(self, from: P, to: Q) -> io::Result<()> {
         match self.0.lock().unwrap().deref() {
             &Some(ref vfat) => vfat.rename(from, to),
             &None => panic!("uninitialized"),
         }
     }
 
-    fn remove(self, path: &str, children: bool) -> io::Result<()> {
+    fn remove<P: AsRef<Path>>(self, path: P, children: bool) -> io::Result<()> {
         match self.0.lock().unwrap().deref() {
             &Some(ref vfat) => vfat.remove(path, children),
             &None => panic!("uninitialized"),

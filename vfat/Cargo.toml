@@ -1,10 +1,9 @@
 [package]
-name = "sys_fs"
+name = "vfat"
 version = "0.1.0"
 
 [dependencies]
-#fnv = "1"
-sys = { path = "../sys" }
+hashmap_core = "0.1"
 
 [dev-dependencies]
 rand = "0.4"

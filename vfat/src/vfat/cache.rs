@@ -1,13 +1,12 @@
-use std::{io, fmt};
-use std::collections::HashMap;
+use io;
+use core::fmt;
+use hash_map::HashMap;
+use hash_map::Entry;
+
+use alloc::boxed::Box;
+use alloc::vec::Vec;
 
 use traits::BlockDevice;
-
-#[derive(Debug)]
-struct CacheEntry {
-    data: Vec<u8>,
-    dirty: bool
-}
 
 pub struct Partition {
     /// The physical sector where the partition begins.
@@ -16,10 +15,16 @@ pub struct Partition {
     pub sector_size: u64
 }
 
+#[derive(Debug)]
+struct CacheEntry {
+    data: Vec<u8>,
+    dirty: bool,
+}
+
 pub struct CachedDevice {
     device: Box<BlockDevice>,
     cache: HashMap<u64, CacheEntry>,
-    partition: Partition
+    partition: Partition,
 }
 
 impl CachedDevice {
@@ -42,15 +47,15 @@ impl CachedDevice {
     /// # Panics
     ///
     /// Panics if the partition's sector size is < the device's sector size.
-    pub fn new<T>(device: T, partition: Partition) -> CachedDevice
+    pub fn new<T>(device: T, partition: Partition) -> Self
         where T: BlockDevice + 'static
     {
         assert!(partition.sector_size >= device.sector_size());
 
-        CachedDevice {
+        Self {
             device: Box::new(device),
-            cache: HashMap::new(),
-            partition: partition
+            cache: HashMap::default(),
+            partition,
         }
     }
 
@@ -81,7 +86,23 @@ impl CachedDevice {
     ///
     /// Returns an error if there is an error reading the sector from the disk.
     pub fn get_mut(&mut self, sector: u64) -> io::Result<&mut [u8]> {
-        unimplemented!("CachedDevice::get_mut()")
+        let (sector, factor) = self.virtual_to_physical(sector);
+
+        let cap = self.sector_size() as usize;
+        let entry = match self.cache.entry(sector) {
+            Entry::Occupied(mut entry) => {
+                entry.get_mut().dirty = true;
+                entry.into_mut()
+            }
+            Entry::Vacant(entry) => {
+                let mut data = Vec::with_capacity(cap);
+                for i in 0..factor {
+                    self.device.read_all_sector(sector + i, &mut data)?;
+                }
+                entry.insert(CacheEntry { data, dirty: true })
+            }
+        };
+        Ok(&mut entry.data)
     }
 
     /// Returns a reference to the cached sector `sector`. If the sector is not
@@ -91,12 +112,68 @@ impl CachedDevice {
     ///
     /// Returns an error if there is an error reading the sector from the disk.
     pub fn get(&mut self, sector: u64) -> io::Result<&[u8]> {
-        unimplemented!("CachedDevice::get()")
+        let (sector, factor) = self.virtual_to_physical(sector);
+
+        let cap = self.sector_size() as usize;
+        let entry = match self.cache.entry(sector) {
+            Entry::Occupied(mut entry) => {
+                entry.into_mut()
+            }
+            Entry::Vacant(entry) => {
+                let mut data = Vec::with_capacity(cap);
+                for i in 0..factor {
+                    self.device.read_all_sector(sector + i, &mut data)?;
+                }
+                entry.insert(CacheEntry { data, dirty: false })
+            }
+        };
+        Ok(&entry.data)
+    }
+
+    pub fn drop_read_cache(&mut self) {
+        self.cache.retain(|_, v| !v.dirty)
+    }
+
+    pub fn sync_sector(&mut self, sector: u64, remove: bool) -> io::Result<()> {
+        let (sector, factor) = self.virtual_to_physical(sector);
+
+        let chunk_size = self.device.sector_size() as usize;
+        if let Entry::Occupied(mut entry) = self.cache.entry(sector) {
+            {
+                let entry = entry.get_mut();
+                if entry.dirty {
+                    let chunks = entry.data.chunks(chunk_size);
+                    for (i, data) in chunks.enumerate() {
+                        self.device.write_sector(sector + i as u64, data)?;
+                    }
+                    entry.dirty = false;
+                }
+            }
+            if remove {
+                entry.remove_entry();
+            }
+        }
+        Ok(())
     }
 }
 
-// FIXME: Implement `BlockDevice` for `CacheDevice`. The `read_sector` and
-// `write_sector` methods should only read/write from/to cached sectors.
+impl BlockDevice for CachedDevice {
+    fn sector_size(&self) -> u64 {
+        self.partition.sector_size
+    }
+    fn read_sector(&mut self, n: u64, buf: &mut [u8]) -> io::Result<usize> {
+        let sector = self.get(n)?;
+        let len = buf.len().min(sector.len());
+        buf[..len].copy_from_slice(&sector[..len]);
+        Ok(len)
+    }
+    fn write_sector(&mut self, n: u64, buf: &[u8]) -> io::Result<usize> {
+        let sector = self.get_mut(n)?;
+        let len = buf.len().min(sector.len());
+        sector[..len].copy_from_slice(&buf[..len]);
+        Ok(len)
+    }
+}
 
 impl fmt::Debug for CachedDevice {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

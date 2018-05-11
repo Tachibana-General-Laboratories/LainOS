@@ -1,4 +1,4 @@
-use std::ops::{Deref, DerefMut};
+use core::ops::{Deref, DerefMut};
 
 /// A smart pointer to a shared instance of type `T`.
 ///
@@ -8,10 +8,11 @@ use std::ops::{Deref, DerefMut};
 #[derive(Debug)]
 pub struct Shared<T>(imp::Inner<T>);
 
-#[cfg(target_os = "ros")]
+//#[cfg(target_os = "lainos")]
+#[cfg(not(test))]
 mod imp {
-    use std::rc::Rc;
-    use std::sync::Mutex;
+    use alloc::rc::Rc;
+    use mutex::Mutex;
     use super::Shared;
 
     pub type Inner<T> = Rc<Mutex<T>>;
@@ -27,7 +28,8 @@ mod imp {
     unsafe impl<T> Send for Shared<T> {}
 }
 
-#[cfg(not(target_os = "ros"))]
+//#[cfg(not(target_os = "lainos"))]
+#[cfg(test)]
 mod imp {
     use std::sync::{Arc, Mutex};
 

@@ -6,7 +6,7 @@ version = "0.1.0"
 #spin = "*"
 #slab_allocator = "0.3.0"
 
-sys_fs = { path = "../sys_fs" }
+vfat = { path = "../vfat", features = [] }
 sys = { path = "../sys" }
 pi = { path = "../pi", features = [] }
 #pi = { path = "../pi" }

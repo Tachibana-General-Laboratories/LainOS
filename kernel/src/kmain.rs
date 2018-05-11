@@ -17,6 +17,7 @@
 
 
 #![cfg_attr(not(test), no_std)]
+#[cfg(test)]extern crate core;
 
 #[macro_use]
 extern crate bitflags;
@@ -29,7 +30,7 @@ extern crate alloc;
 
 #[cfg(not(test))] extern crate sys;
 #[cfg(not(test))] extern crate pi;
-#[cfg(not(test))] extern crate sys_fs as fat32;
+#[cfg(not(test))] extern crate vfat;
 
 
 /*
@@ -37,8 +38,8 @@ extern crate alloc;
 extern crate log;
 */
 
-pub mod console;
-pub mod elf;
+#[cfg(not(test))] pub mod console;
+#[cfg(not(test))] pub mod elf;
 
 #[cfg(not(test))] pub mod aarch64;
 #[cfg(not(test))] pub mod process;
@@ -108,26 +109,66 @@ pub extern "C" fn kernel_main() -> ! {
 
     print_atags();
 
-    kprintln!("{:?}", aarch64::AArch64::new());
-    kprintln!("MAIR_EL1: {:?}", aarch64::MemoryAttributeIndirectionRegister::el1());
-
     /*
     init_logger().unwrap();
     info!("test logger");
     */
 
-    kprintln!("initialize mmu");
-    unsafe { mmu::init_mmu(); }
-
+    if false {
+        kprintln!("--------------");
+        kprintln!("initialize mmu");
+        kprintln!("--------------");
+        kprintln!("{:?}", aarch64::AArch64::new());
+        kprintln!("MAIR_EL1: {:?}", aarch64::MemoryAttributeIndirectionRegister::el1());
+        mmu::init_mmu();
+        kprintln!("--------------");
+    }
 
     {
         kprint!("allocator init: ");
         ALLOCATOR.initialize();
         kprintln!("OK");
+    }
+
+    if false {
+        use alloc::string::{String, ToString};
+        let mut fuck: String = "##fuck".to_string();
+        for n in 0..512 {
+            fuck += " fuck";
+        }
+        fuck += "##";
+        kprintln!("{:p}: `{}`", fuck.as_ptr(), fuck);
+    }
+
+    //loop {}
+
+
+    if true {
+        use vfat::traits::*;
 
         kprint!("file system init: ");
         FILE_SYSTEM.initialize();
         kprintln!("OK");
+
+        /*
+        let vfat = FILE_SYSTEM.0.lock().unwrap().as_ref().unwrap().clone();
+        let entries = vfat::vfat::Dir::root(vfat).entries();
+        for e in entries.unwrap() {
+            kprintln!("  `{}`", e.name());
+        }
+        */
+
+        match FILE_SYSTEM.open_dir("").and_then(|e| e.entries()) {
+            Ok(entries) => {
+                kprintln!("ls /");
+                for e in entries {
+                    kprintln!("   /{}", e.name());
+                }
+            }
+            Err(err) => kprintln!("ls: {:?}", err),
+        }
+
+        kprintln!("--------");
     }
 
 

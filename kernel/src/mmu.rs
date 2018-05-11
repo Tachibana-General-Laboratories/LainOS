@@ -18,6 +18,7 @@ pub const PAGESIZE_64K: usize = 2 << 15;
 pub const PAGESIZE: usize = 4096;
 const TTBR_ENABLE: u64 = 1;
 
+/*
 // granularity
 pub const PT_PAGE: u64 =     0b11;       // 4k granule
 pub const PT_BLOCK: u64 =    0b01;       // 2M granule
@@ -38,24 +39,40 @@ pub const PT_ISH: u64 =      3 << 8;      // inner shareable
 pub const PT_MEM: u64 =      0 << 2;      // normal memory
 pub const PT_DEV: u64 =      1 << 2;      // device MMIO
 pub const PT_NC: u64 =       2 << 2;      // non-cachable
+*/
 
 // get addresses from linker
 extern "C" {
-    static _data: usize;
-    static _ttbr_start: usize;
+    static _data: *mut u8;
+    //static _ttbr_start: *mut u8;
 }
 
+
+#[repr(align(4096))]
+struct Level([u64; 512]);
+
+static mut TTBR: [Level; 6] = [
+    Level([0; 512]),
+    Level([0; 512]),
+    Level([0; 512]),
+    Level([0; 512]),
+    Level([0; 512]),
+    Level([0; 512]),
+];
+
 struct Table<'a> {
-    l1: &'a mut [Volatile<Entry>],
-    l2: &'a mut [Volatile<Entry>],
-    l3: &'a mut [Volatile<Entry>],
+    l1: &'a mut [Volatile<Entry>; 512],
+    l2: &'a mut [Volatile<Entry>; 512],
+    l3: &'a mut [Volatile<Entry>; 512],
 }
 
 impl<'a> Table<'a> {
     unsafe fn new(l1: usize, l2: usize, l3: usize) -> Self {
-        let l1 = slice::from_raw_parts_mut(l1 as *mut Volatile<Entry>, 512);
-        let l2 = slice::from_raw_parts_mut(l2 as *mut Volatile<Entry>, 512);
-        let l3 = slice::from_raw_parts_mut(l3 as *mut Volatile<Entry>, 512);
+        kprintln!("L1: {:x} L2: {:x} L3: {:x}", l1, l2, l3);
+
+        let l1 = &mut *(l1 as *mut [Volatile<Entry>; 512]);
+        let l2 = &mut *(l2 as *mut [Volatile<Entry>; 512]);
+        let l3 = &mut *(l3 as *mut [Volatile<Entry>; 512]);
         Self { l1, l2, l3 }
     }
     /*
@@ -79,41 +96,40 @@ impl<'a> Table<'a> {
 
 /// Set up page translation tables and enable virtual memory
 pub extern fn init_mmu() {
+    let _ttbr_start = unsafe { &TTBR as *const [Level; 6] as *mut u8 };
+    unsafe { kprintln!("_ttbr_start: {:p}, _data: {:p}", _ttbr_start, _data); }
     // create MMU translation tables at _end
 
     // user space
     let ttbr0 = unsafe {
-        let l1 = _ttbr_start + PAGESIZE * 0;
-        let l2 = _ttbr_start + PAGESIZE * 2;
-        let l3 = _ttbr_start + PAGESIZE * 3;
+        let l1 = _ttbr_start as usize + PAGESIZE * 0;
+        let l2 = _ttbr_start as usize + PAGESIZE * 2;
+        let l3 = _ttbr_start as usize + PAGESIZE * 3;
         Table::new(l1, l2, l3)
     };
 
     // kernel space
     let ttbr1 = unsafe {
-        let l1 = _ttbr_start + PAGESIZE * 1;
-        let l2 = _ttbr_start + PAGESIZE * 4;
-        let l3 = _ttbr_start + PAGESIZE * 5;
+        let l1 = _ttbr_start as usize + PAGESIZE * 1;
+        let l2 = _ttbr_start as usize + PAGESIZE * 4;
+        let l3 = _ttbr_start as usize + PAGESIZE * 5;
         Table::new(l1, l2, l3)
     };
 
     // identity L1
     let addr = PhysicalAddr::from(ttbr0.l2.as_mut_ptr());
     ttbr0.l1[0].write(Entry::table(addr) | Entry::AF | Entry::SH_INNER | Entry::AP_EL0);
-    let addr = PhysicalAddr::from(ttbr1.l2.as_mut_ptr());
-    ttbr1.l1[1].write(Entry::table(addr) | Entry::AF | Entry::SH_INNER);
+    ttbr1.l1[1].write(Entry::table(ttbr1.l2.as_mut_ptr().into()) | Entry::AF | Entry::SH_INNER);
 
     // identity L2, first 2M block
-    let addr = PhysicalAddr::from(ttbr0.l3.as_mut_ptr());
-    ttbr0.l2[0].write(Entry::table(addr) | Entry::AF | Entry::SH_INNER | Entry::AP_EL0);
+    ttbr0.l2[0].write(Entry::table(ttbr0.l3.as_mut_ptr().into()) | Entry::AF | Entry::SH_INNER | Entry::AP_EL0);
+    ttbr1.l2[0].write(Entry::table(ttbr1.l3.as_mut_ptr().into()) | Entry::AF | Entry::SH_INNER);
 
     // identity L2 2M blocks
     let b = IO_BASE >> 21;
 
     // skip 0th, as we're about to map it by L3
     for r in 1..512usize {
-        let addr = PhysicalAddr::from(((r<<21) as u64) as *mut u8);
-
         // different attributes for device memory
         let attributes = if r >= b {
             Entry::SH_OUTER.with_attr_index(1)
@@ -121,6 +137,7 @@ pub extern fn init_mmu() {
             Entry::SH_INNER
         };
 
+        let addr = PhysicalAddr::from(((r<<21) as u64) as *mut u8);
         let block = Entry::block(addr) | Entry::AF | Entry::XN | attributes;
         ttbr0.l2[r].write(block | Entry::AP_EL0);
         ttbr1.l2[r].write(block);
@@ -128,8 +145,6 @@ pub extern fn init_mmu() {
 
     // identity L3
     for r in 0..512usize {
-        let addr = PhysicalAddr::from((r * PAGESIZE) as *mut u8);
-
         // different for code and data
         let attributes = if r < 0x80 || r as u64 > unsafe { _data as u64 } / PAGESIZE as u64 {
             Entry::XN
@@ -137,6 +152,7 @@ pub extern fn init_mmu() {
             Entry::AP_RO
         };
 
+        let addr = PhysicalAddr::from((r * PAGESIZE) as *mut u8);
         let page = Entry::page(addr) | Entry::AF | Entry::SH_INNER | attributes;
         ttbr0.l3[r].write(page | Entry::AP_EL0);
         ttbr1.l3[r].write(page);
@@ -150,10 +166,10 @@ pub extern fn init_mmu() {
     */
 
     unsafe {
-        let ttbr0 = _ttbr_start as *mut u8;
-        let ttbr1 = (_ttbr_start + PAGESIZE) as *mut u8;
+        let ttbr0 = _ttbr_start;
+        let ttbr1 = _ttbr_start.add(PAGESIZE);
 
-        enable_mmu(PhysicalAddr::from(ttbr0), PhysicalAddr::from(ttbr1));
+        enable_mmu(ttbr0.into(), ttbr1.into());
     }
 }
 
@@ -164,11 +180,10 @@ unsafe fn enable_mmu(ttbr0: PhysicalAddr, ttbr1: PhysicalAddr) {
     let mmfr = aarch64::MMFR::new();
 
     let b = mmfr.physical_address_range();
-    if !mmfr.support_4kb_granulate() || b < aarch64::PhysicalAddressRange::R36 {
-        panic!("4k granule or 36 bit address space not supported");
-    }
-    let b = b.raw() as u64;
+    assert!(mmfr.support_4kb_granulate(), "4k granulate not supported");
+    assert!(b >= aarch64::PhysicalAddressRange::R36, "36 bit address space not supported");
 
+    let b = b.raw() as u64;
 
     // first, set Memory Attributes array, indexed by PT_MEM, PT_DEV, PT_NC in our example
     let r: u64 = (0xFF << 0) |    // AttrIdx=0: normal, IWBWA, OWBWA, NTR
@@ -193,7 +208,7 @@ unsafe fn enable_mmu(ttbr0: PhysicalAddr, ttbr1: PhysicalAddr) {
         (0b0  <<  7) | // EPD0 enable lower half
         (25   <<  0);  // T0SZ=25, 3 levels (512G)
 
-    asm!("msr tcr_el1, $0; isb" : : "r" (r) : : "volatile");
+    asm!("msr tcr_el1, $0; isb" :: "r"(r) :: "volatile");
 
     // tell the MMU where our translation tables are.
     // TTBR_ENABLE bit not documented, but required

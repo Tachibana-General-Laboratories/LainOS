@@ -1,4 +1,4 @@
-use std::io;
+use io;
 use traits::{File, Dir, Entry, Metadata, Timestamp};
 
 /// A type that implements all of the file system traits.

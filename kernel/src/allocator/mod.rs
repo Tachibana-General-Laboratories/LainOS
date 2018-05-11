@@ -114,5 +114,11 @@ fn memory_map() -> Option<(usize, usize)> {
         .map(|t| (t.start + t.size) as usize)
         .max()
         .unwrap_or(0x4000_0000);
+
+    //let start = start   | 0xFFFF_FF80_0000_0000;
+    //let end = end       | 0xFFFF_FF80_0000_0000;
+    //
+    //let start = start   | 0xFFFF_0000_0000_0000;
+    //let end = end       | 0xFFFF_0000_0000_0000;
     Some((start, end))
 }

@@ -1,7 +1,24 @@
-use alloc::string::{String, ToString};
 use core::result;
 
+use alloc::string::String;
+
 pub type Result<T> = result::Result<T, Error>;
+
+#[derive(Debug)]
+pub struct Error {
+    kind: ErrorKind,
+    error: String,
+}
+
+impl Error {
+    pub fn new<E: Into<String>>(kind: ErrorKind, error: E) -> Self {
+        Self { kind, error: error.into() }
+    }
+
+    pub fn kind(&self) -> ErrorKind {
+        self.kind
+    }
+}
 
 /// A list specifying general categories of I/O error.
 ///
@@ -11,36 +28,36 @@ pub type Result<T> = result::Result<T, Error>;
 /// It is used with the [`io::Error`] type.
 ///
 /// [`io::Error`]: struct.Error.html
-#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[derive(Copy, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 #[allow(deprecated)]
-pub enum Error {
+pub enum ErrorKind {
     /// An entity was not found, often a file.
-    NotFound(String),
+    NotFound,
     /// The operation lacked the necessary privileges to complete.
-    PermissionDenied(String),
+    PermissionDenied,
     /// The connection was refused by the remote server.
-    ConnectionRefused(String),
+    ConnectionRefused,
     /// The connection was reset by the remote server.
-    ConnectionReset(String),
+    ConnectionReset,
     /// The connection was aborted (terminated) by the remote server.
-    ConnectionAborted(String),
+    ConnectionAborted,
     /// The network operation failed because it was not connected yet.
-    NotConnected(String),
+    NotConnected,
     /// A socket address could not be bound because the address is already in
     /// use elsewhere.
-    AddrInUse(String),
+    AddrInUse,
     /// A nonexistent interface was requested or the requested address was not
     /// local.
-    AddrNotAvailable(String),
+    AddrNotAvailable,
     /// The operation failed because a pipe was closed.
-    BrokenPipe(String),
+    BrokenPipe,
     /// An entity already exists, often a file.
-    AlreadyExists(String),
+    AlreadyExists,
     /// The operation needs to block to complete, but the blocking operation was
     /// requested to not occur.
-    WouldBlock(String),
+    WouldBlock,
     /// A parameter was incorrect.
-    InvalidInput(String),
+    InvalidInput,
     /// Data not valid for the operation were encountered.
     ///
     /// Unlike [`InvalidInput`], this typically means that the operation
@@ -51,9 +68,9 @@ pub enum Error {
     /// `InvalidData` if the file's contents are not valid UTF-8.
     ///
     /// [`InvalidInput`]: #variant.InvalidInput
-    InvalidData(String),
+    InvalidData,
     /// The I/O operation's timeout expired, causing it to be canceled.
-    TimedOut(String),
+    TimedOut,
     /// An error returned when an operation could not be completed because a
     /// call to [`write`] returned [`Ok(0)`].
     ///
@@ -63,13 +80,13 @@ pub enum Error {
     ///
     /// [`write`]: ../../std/io/trait.Write.html#tymethod.write
     /// [`Ok(0)`]: ../../std/io/type.Result.html
-    WriteZero(String),
+    WriteZero,
     /// This operation was interrupted.
     ///
     /// Interrupted operations can typically be retried.
-    Interrupted(String),
+    Interrupted,
     /// Any I/O error not part of this list.
-    Other(String),
+    Other,
 
     /// An error returned when an operation could not be completed because an
     /// "end of file" was reached prematurely.
@@ -77,7 +94,7 @@ pub enum Error {
     /// This typically means that an operation could only succeed if it read a
     /// particular number of bytes but only a smaller number of bytes could be
     /// read.
-    UnexpectedEof(String),
+    UnexpectedEof,
 
     /*
     /// A marker variant that tells the compiler that users of this enum cannot
@@ -105,12 +122,13 @@ pub trait Read {
             match self.read(buf) {
                 Ok(0) => break,
                 Ok(n) => { let tmp = buf; buf = &mut tmp[n..]; }
-                Err(Error::Interrupted(_)) => {}
+                Err(ref e) if e.kind() == ErrorKind::Interrupted => {}
                 Err(e) => return Err(e),
             }
         }
         if !buf.is_empty() {
-            Err(Error::UnexpectedEof("failed to fill whole buffer".to_string()))
+            Err(Error::new(ErrorKind::UnexpectedEof,
+                           "failed to fill whole buffer"))
         } else {
             Ok(())
         }

@@ -2,8 +2,8 @@ use core::slice::from_raw_parts;
 use core::mem::size_of;
 use alloc::Vec;
 use alloc::string::ToString;
-use sys::fs::io;
-use sys::fs::File;
+use vfat::io;
+use vfat::traits::File;
 use sys::VecExt;
 
 use vm::{self, VirtualAddr};
@@ -131,7 +131,7 @@ pub fn spawn<F: File>(file: &mut F, aux: &[u8]) -> io::Result<()> {
 
 
     if !header.check_magic() {
-        return Err(io::Error::InvalidData("spawn: bad magic".to_string()))
+        return Err(io::Error::new(io::ErrorKind::InvalidData, "spawn: bad magic"))
     }
 
     let _ = file.seek(io::SeekFrom::Start(header.e_phoff))?;
@@ -147,7 +147,7 @@ pub fn spawn<F: File>(file: &mut F, aux: &[u8]) -> io::Result<()> {
             continue;
         }
         if ph.check_vaddr(PAGESZ) && ph.p_memsz < ph.p_filesz {
-            return Err(io::Error::InvalidData("spawn: fail mem attributes".to_string()))
+            return Err(io::Error::new(io::ErrorKind::InvalidData, "spawn: fail mem attributes"))
         }
 
         /*

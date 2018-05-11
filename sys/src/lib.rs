@@ -5,15 +5,14 @@
 #![feature(toowned_clone_into)]
 
 //#![cfg_attr(test, feature(inclusive_range_syntax))]
-#![no_std]
-//extern crate core;
+#![cfg_attr(not(test), no_std)]
+#[cfg(test)]extern crate core;
 
 extern crate alloc;
 pub extern crate hashmap_core;
 //pub extern crate core_io as io;
 
 pub mod volatile;
-pub mod fs;
 
 mod stack_vec;
 mod mutex;

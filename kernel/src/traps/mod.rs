@@ -77,5 +77,19 @@ pub extern fn handle_exception(info: Info, esr: u32, tf: &mut TrapFrame) {
         }
     }
 
-    panic!("IT'S A TRAP: {:?} {:?} {:?}", info, syndrome, tf);
+    /*
+    if info.source == CurrentSpElx && info.kind == Synchronous {
+        match syndrome {
+            Syndrome::Brk(num) => {
+                kprintln!("!!! BRK EL1 {:?} at {:08X}", num, tf.elr);
+                tf.elr += 4;
+                return;
+            }
+            _ => (),
+        }
+    }
+    */
+
+    panic!("IT'S A TRAP: {:?} {:?} {:?} esr: {:08x}\n{:?}",
+           info.source, info.kind, syndrome, esr, tf);
 }

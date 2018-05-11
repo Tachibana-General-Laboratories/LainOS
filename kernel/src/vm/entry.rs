@@ -39,7 +39,7 @@ bitflags! {
         const SH = 0b11 << 8;
         const AP = 0b11 << 6;
         const NS = 1 << 5;
-        const ATTR_INDX = 0b11 << 2;
+        const ATTR_INDX = 0b111 << 2;
 
         const AP_RO = 1 << 7;
         const AP_EL0 = 1 << 6;
@@ -88,7 +88,7 @@ impl Entry {
     }
 
     pub fn with_attr_index(mut self, idx: u8) -> Self {
-        self.bits |= ((idx & 0b11) as u64) << 2;
+        self.bits |= ((idx & 0b111) as u64) << 2;
         self
     }
 
