@@ -1,4 +1,4 @@
-use core::{fmt, mem};
+use std::{fmt, mem};
 
 use traits::BlockDevice;
 use vfat::Error;

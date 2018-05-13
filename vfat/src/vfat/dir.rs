@@ -1,11 +1,10 @@
-use ffi::OsStr;
-use core::char::decode_utf16;
-use borrow::Cow;
-use io;
-use core::mem;
+use std::{io, mem};
+use std::ffi::OsStr;
+use std::char::decode_utf16;
+use std::borrow::Cow;
 
-use alloc::string::{String, ToString};
-use alloc::vec::Vec;
+use std::string::{String, ToString};
+use std::vec::Vec;
 
 use traits;
 use util::VecExt;

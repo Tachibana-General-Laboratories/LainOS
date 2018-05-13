@@ -43,4 +43,3 @@ pub trait Metadata: Sized {
     /// The timestamp for the entry's last modification.
     fn modified(&self) -> Self::Timestamp;
 }
-

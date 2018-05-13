@@ -1,4 +1,4 @@
-use vfat::io;
+use sys::io;
 use vfat::traits::BlockDevice;
 use alloc::string::ToString;
 

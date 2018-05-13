@@ -2,11 +2,12 @@ pub mod sd;
 
 use core::ops::Deref;
 
-use vfat::{traits, io};
-use vfat::path::Path;
+use vfat::traits;
 use vfat::vfat::{self, Shared, VFat};
 
-use sys::Mutex;
+use sys::io;
+use sys::path::Path;
+use sys::sync::Mutex;
 use self::sd::Sd;
 
 pub struct FileSystem(pub Mutex<Option<Shared<VFat>>>);

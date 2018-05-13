@@ -6,3 +6,7 @@ authors = ["Lain-dono <lain.dono@gmail.com>"]
 [dependencies]
 hashmap_core = "0.1.5"
 #core_io = "0.1"
+
+[features]
+default = []
+std_shim = []

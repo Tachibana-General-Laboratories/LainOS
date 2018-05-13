@@ -1,7 +1,7 @@
-use core::mem::{size_of, align_of, forget};
-use core::slice::{from_raw_parts, from_raw_parts_mut};
+use std::mem::{size_of, align_of, forget};
+use std::slice::{from_raw_parts, from_raw_parts_mut};
 
-use alloc::vec::Vec;
+use std::vec::Vec;
 
 pub trait VecExt {
     /// Casts a `Vec<T>` into a `Vec<U>`.

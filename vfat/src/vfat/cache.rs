@@ -1,10 +1,7 @@
-use io;
-use core::fmt;
-use hash_map::HashMap;
-use hash_map::Entry;
-
-use alloc::boxed::Box;
-use alloc::vec::Vec;
+use std::{io, fmt};
+use std::collections::hash_map::{HashMap, Entry};
+use std::boxed::Box;
+use std::vec::Vec;
 
 use traits::BlockDevice;
 

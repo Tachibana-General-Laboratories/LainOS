@@ -1,5 +1,5 @@
-use io;
-use path::Path;
+use std::io;
+use std::path::Path;
 
 use traits::Metadata;
 

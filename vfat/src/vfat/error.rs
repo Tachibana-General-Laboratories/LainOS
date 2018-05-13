@@ -1,4 +1,4 @@
-use io;
+use std::io;
 
 use mbr;
 

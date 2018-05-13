@@ -2,8 +2,8 @@ use core::slice::from_raw_parts;
 use core::mem::size_of;
 use alloc::Vec;
 use alloc::string::ToString;
-use vfat::io;
 use vfat::traits::File;
+use sys::io;
 use sys::VecExt;
 
 use vm::{self, VirtualAddr};

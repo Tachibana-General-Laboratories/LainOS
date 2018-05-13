@@ -1,9 +1,9 @@
-use io::{self, Write};
-use path::Path;
-use core::mem::size_of;
-use core::cmp::min;
+use std::io::{self, Write};
+use std::path::Path;
+use std::mem::size_of;
+use std::cmp::min;
 
-use alloc::vec::Vec;
+use std::vec::Vec;
 
 use util::SliceExt;
 use mbr::MasterBootRecord;
@@ -164,10 +164,8 @@ impl<'a> FileSystem for &'a Shared<VFat> {
     type Entry = Entry;
 
     fn open<P: AsRef<Path>>(self, path: P) -> io::Result<Self::Entry> {
-        use path::Component;
-        //unimplemented!("FileSystem::open()")
+        use std::path::Component;
 
-        //use sys::fs::path::*;
         let mut root = Dir::root(self.clone());
         for c in path.as_ref().components() {
             match c {

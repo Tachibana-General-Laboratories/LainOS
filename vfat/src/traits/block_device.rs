@@ -1,6 +1,6 @@
-use io;
-use alloc::boxed::Box;
-use alloc::vec::Vec;
+use std::io;
+use std::boxed::Box;
+use std::vec::Vec;
 
 /// Trait implemented by devices that can be read/written in sector
 /// granularities.
@@ -67,8 +67,8 @@ impl<'a, T: BlockDevice> BlockDevice for &'a mut T {
 }
 
 macro impl_for_read_write_seek($(<$($gen:tt),*>)* $T:path) {
-    use io::{Read, Write, Seek};
-    use core::cmp::min;
+    use std::io::{Read, Write, Seek};
+    use std::cmp::min;
 
     impl $(<$($gen),*>)* BlockDevice for $T {
         fn read_sector(&mut self, n: u64, buf: &mut [u8]) -> io::Result<usize> {
@@ -89,7 +89,7 @@ macro impl_for_read_write_seek($(<$($gen:tt),*>)* $T:path) {
     }
 }
 
-#[cfg(test)] impl_for_read_write_seek!(<'a> ::io::Cursor<&'a mut [u8]>);
-#[cfg(test)] impl_for_read_write_seek!(::io::Cursor<Vec<u8>>);
-#[cfg(test)] impl_for_read_write_seek!(::io::Cursor<Box<[u8]>>);
+#[cfg(test)] impl_for_read_write_seek!(<'a> ::std::io::Cursor<&'a mut [u8]>);
+#[cfg(test)] impl_for_read_write_seek!(::std::io::Cursor<Vec<u8>>);
+#[cfg(test)] impl_for_read_write_seek!(::std::io::Cursor<Box<[u8]>>);
 #[cfg(test)] impl_for_read_write_seek!(::std::fs::File);

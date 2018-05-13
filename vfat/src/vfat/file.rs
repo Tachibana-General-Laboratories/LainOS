@@ -1,7 +1,7 @@
-use core::cmp::{min, max};
-use io::{self, SeekFrom};
+use std::cmp::{min, max};
+use std::io::{self, SeekFrom};
 
-use alloc::string::String;
+use std::string::String;
 
 use traits;
 use vfat::{VFat, Shared, Cluster, Metadata};

@@ -3,6 +3,7 @@ name = "vfat"
 version = "0.1.0"
 
 [dependencies]
+sys = { path = "../sys", features = ["std_shim"] }
 hashmap_core = "0.1"
 
 [dev-dependencies]

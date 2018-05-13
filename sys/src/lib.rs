@@ -19,56 +19,188 @@ mod mutex;
 mod util;
 
 pub use stack_vec::StackVec;
+pub use util::{SliceExt, VecExt};
 pub use mutex::Mutex;
 
-pub mod hash_map {
-    pub use hashmap_core::{HashMap, HashSet};
-    pub use hashmap_core::map::Entry;
+pub mod io;
+
+#[cfg(feature = "std_shim")]
+pub use core::{
+    any,
+    ascii,
+    //borrow,
+    cell,
+    char,
+    clone,
+    cmp,
+    convert,
+    default,
+    f32,
+    f64,
+    //fmt,
+    hash,
+    i8,
+    i16,
+    i32,
+    i64,
+    i128,
+    isize,
+    iter,
+    marker,
+    mem,
+    num,
+    ops,
+    option,
+    prelude,
+    ptr,
+    result,
+    //slice,
+    //str,
+    //sync,
+    time,
+    u8,
+    u16,
+    u32,
+    u64,
+    u128,
+    usize,
+    /*
+    arch,
+    array,
+    heap,
+    intrinsics,
+    nonzero,
+    panic,
+    panicking,
+    raw,
+    simd,
+    */
+};
+
+#[cfg(feature = "std_shim")]
+pub use alloc::{
+    arc,
+    binary_heap,
+    borrow,
+    boxed,
+    btree_map,
+    btree_set,
+    fmt,
+    linked_list,
+    rc,
+    slice,
+    str,
+    string,
+    vec,
+    vec_deque,
+    //allocator,
+    //heap,
+    //raw_vec,
+};
+
+#[cfg(feature = "std_shim")]
+pub mod collections {
+    pub mod hash_map {
+        pub use hashmap_core::{HashMap, HashSet};
+        pub use hashmap_core::map::Entry;
+    }
 }
 
-pub use hash_map::{HashMap, HashSet};
-pub use alloc::boxed::Box;
-pub use alloc::*;
+#[cfg(feature = "std_shim")]
+pub mod sync {
+    pub use super::mutex::{Mutex, MutexGuard};
+    pub use core::sync::atomic;
+}
 
-pub use util::*;
-
+#[cfg(feature = "std_shim")]
 pub mod ffi {
-    pub use alloc::*;
-    pub struct OsStr {
-        inner: [u8],
-    }
+    use core::str::from_utf8;
+    use core::mem;
+
+    pub struct OsStr(pub [u8]);
+
     impl OsStr {
         pub fn to_str(&self) -> Option<&str> {
-            ::core::str::from_utf8(&self.inner).ok()
+            from_utf8(&self.0).ok()
         }
     }
-    #[derive(Clone)]
-    pub struct OsString {
-        inner: String,
+
+    impl AsRef<OsStr> for OsStr {
+        fn as_ref(&self) -> &OsStr {
+            self
+        }
+    }
+
+    impl AsRef<OsStr> for str {
+        fn as_ref(&self) -> &OsStr {
+            unsafe { mem::transmute(self) }
+        }
+    }
+
+    impl AsRef<OsStr> for [u8] {
+        fn as_ref(&self) -> &OsStr {
+            unsafe { mem::transmute(self) }
+        }
     }
 }
 
-pub use ffi::*;
+#[cfg(feature = "std_shim")]
+pub mod path {
+    use core::mem;
+    use super::ffi::OsStr;
 
-pub mod prelude {
+    pub struct Path {
+        inner: OsStr,
+    }
+
+    impl Path {
+        pub fn components(&self) -> impl Iterator<Item=Component> {
+            self.inner.0.split(|&c| c == b'/')
+                .filter(|s| s.len() > 0)
+                .map(|s| s.as_ref())
+                .map(Component::Normal)
+                    /*
+                .map(|s| if s.len() == 0 {
+                    Component::RootDir
+                } else {
+                    Component::Normal(s.as_ref())
+                })
+                */
+        }
+    }
+
+    impl AsRef<Path> for str {
+        fn as_ref(&self) -> &Path {
+            unsafe { mem::transmute(self) }
+        }
+    }
+
+
     /*
-    std::marker::{Copy, Send, Sized, Sync}. The marker traits indicate fundamental properties of types.
-    std::ops::{Drop, Fn, FnMut, FnOnce}. Various operations for both destructors and overloading ().
-    std::mem::drop, a convenience function for explicitly dropping a value.
-    */
-    pub use alloc::boxed::Box;
-    pub use alloc::borrow::ToOwned;
-    /*
-    std::clone::Clone, the ubiquitous trait that defines clone, the method for producing a copy of a value.
-    std::cmp::{PartialEq, PartialOrd, Eq, Ord }. The comparison traits, which implement the comparison operators and are often seen in trait bounds.
-    std::convert::{AsRef, AsMut, Into, From}. Generic conversions, used by savvy API authors to create overloaded methods.
-    std::default::Default, types that have default values.
-    std::iter::{Iterator, Extend, IntoIterator, DoubleEndedIterator, ExactSizeIterator}. Iterators of various kinds.
-    std::option::Option::{self, Some, None}. A type which expresses the presence or absence of a value. This type is so commonly used, its variants are also exported.
-    std::result::Result::{self, Ok, Err}. A type for functions that may succeed or fail. Like Option, its variants are exported as well.
-    std::slice::SliceConcatExt, a trait that exists for technical reasons, but shouldn't have to exist. It provides a few useful methods on slices.
+    pub struct Components<'a> {
+        path: &'a [u8],
+    }
+
+    impl<'a> Iterator for Components<'a> {
+        type Item = Component<'a>;
+        fn next(&mut self) -> Option<Self::Item> {
+            if self.path.len() == 0 {
+                None
+            }
+            let mut split = self.path.splitn(1, '/');
+            let name = split.next()?;
+            match split.next() {
+                Some(path) => self.path = path,
+                None => self.path = path,
+            }
+
+            name
+        }
+    }
     */
 
-    pub use alloc::string::{String, ToString};
-    pub use alloc::vec::Vec;
+    pub enum Component<'a> {
+        Normal(&'a OsStr),
+        //RootDir,
+    }
 }
