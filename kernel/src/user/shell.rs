@@ -5,13 +5,13 @@ use core::str::FromStr;
 use super::syscall::*;
 
 //use pi::power;
-use console::CONSOLE;
+//use console::CONSOLE;
 
 //use std::io;
 
 //use std::path::{Path, PathBuf};
 
-use FILE_SYSTEM;
+//use FILE_SYSTEM;
 //use sys::fs::*;
 //
 

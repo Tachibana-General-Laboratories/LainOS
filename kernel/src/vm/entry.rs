@@ -1,22 +1,22 @@
-use vm::PhysicalAddr;
-
-#[repr(align(4096))]
-pub struct Table {
-    pub entries: [Entry; 512],
-}
+use vm::{Table, Level, PhysicalAddr};
 
 bitflags! {
     pub struct Entry: u64 {
+        const INVALID = 0;
+
         const VALID = 1;
         const PAGE = 0b11;
         const TABLE = 0b11;
         const BLOCK = 0b01;
 
-        // 58-55 for software use
+
         const USER_MASK     = 0x0780_0000_0000_0000;
         const UPPER_MASK    = 0xFFF0_0000_0000_0000;
         const LOWER_MASK    = 0x0000_0000_0000_0FFC;
         const ADDRESS_MASK  = 0x0000_FFFF_FFFF_F000;
+
+        // 58-55 for software use
+        const NEED_DROP = 1 << 58;
 
         // Next-level attributes in stage 1 VMSAv8-64 Table descriptors
         // 58-51 bits is ignored
@@ -51,35 +51,42 @@ bitflags! {
 
 impl Entry {
     pub fn table(addr: PhysicalAddr) -> Self {
-        Self::TABLE.with_address(addr)
+        Self::TABLE.with_addr(addr)
     }
 
     pub fn page(addr: PhysicalAddr) -> Self {
-        Self::PAGE.with_address(addr)
+        Self::PAGE.with_addr(addr)
     }
 
     pub fn block(addr: PhysicalAddr) -> Self {
-        Self::BLOCK.with_address(addr)
+        Self::BLOCK.with_addr(addr)
     }
 
-    pub fn is_valid(self) -> bool {
+    pub unsafe fn as_table<'a, L: Level>(self) -> Option<&'a mut Table<L>> {
+        if self.is_table() {
+            Some(&mut *(self.addr().as_mut_ptr() as *mut _))
+        } else {
+            None
+        }
+    }
+
+    pub fn need_drop(&self) -> bool {
+        self.contains(Self::VALID | Self::NEED_DROP)
+    }
+
+    pub fn is_valid(&self) -> bool {
         self.contains(Self::VALID)
     }
 
-    pub fn with_valid(mut self, valid: bool) -> Self {
-        self.set(Self::VALID, valid);
-        self
-    }
-
-    pub fn is_block(self) -> bool {
+    pub fn is_block(&self) -> bool {
         self.bits & 0b11 == 0b01
     }
 
-    pub fn is_table(self) -> bool {
+    pub fn is_table(&self) -> bool {
         self.bits & 0b11 == 0b11
     }
 
-    pub fn user_data(self) -> u8 {
+    pub fn user_data(&self) -> u8 {
         ((self.bits >> 55) & 0b1111) as u8
     }
     pub fn with_user_data(mut self, data: u8) -> Self {
@@ -92,10 +99,10 @@ impl Entry {
         self
     }
 
-    pub fn address(self) -> PhysicalAddr {
+    pub fn addr(self) -> PhysicalAddr {
         PhysicalAddr::from((self & Self::ADDRESS_MASK).bits as *mut u8)
     }
-    pub fn with_address(mut self, addr: PhysicalAddr) -> Self {
+    pub fn with_addr(mut self, addr: PhysicalAddr) -> Self {
         self.bits |= (addr.as_u64()) & Self::ADDRESS_MASK.bits;
         self
     }

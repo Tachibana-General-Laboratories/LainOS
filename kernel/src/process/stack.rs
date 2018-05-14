@@ -27,9 +27,7 @@ impl Stack {
     /// fails for some other reason, returns `None`.
     pub fn new() -> Option<Stack> {
         let raw_ptr = unsafe {
-            let raw_ptr: *mut u8 = (&ALLOCATOR).alloc(Stack::layout()).ok()?.cast().as_ptr();
-            raw_ptr.write_bytes(0, Self::SIZE);
-            raw_ptr
+            (&ALLOCATOR).alloc_zeroed(Stack::layout()).ok()?.cast().as_ptr()
         };
 
         let ptr = Unique::new(raw_ptr as *mut _).expect("non-null");

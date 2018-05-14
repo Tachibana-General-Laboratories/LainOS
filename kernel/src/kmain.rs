@@ -70,6 +70,7 @@ pub mod allocator;
 const BINARY_START_ADDR: usize = 0x8_0000; // 512kb
 const KERNEL_SPACE: usize = 0xFFFFFF80_00000000;
 
+/*
 const ADDR_1MB: usize   = 0x0010_0000;
 const ADDR_2MB: usize   = 0x0020_0000;
 const ADDR_4MB: usize   = 0x0040_0000;
@@ -82,6 +83,7 @@ const ADDR_256MB: usize = 0x1000_0000;
 const ADDR_512MB: usize = 0x2000_0000;
 const ADDR_1GB: usize   = 0x4000_0000;
 const ADDR_2GB: usize   = 0x8000_0000;
+*/
 
 
 #[no_mangle]
@@ -106,7 +108,6 @@ pub extern "C" fn kernel_main() -> ! {
     kprintln!("-------------------------------");
     kprintln!();
 
-
     print_atags();
 
     /*
@@ -114,10 +115,14 @@ pub extern "C" fn kernel_main() -> ! {
     info!("test logger");
     */
 
-    if false {
-        kprintln!("--------------");
-        kprintln!("initialize mmu");
-        kprintln!("--------------");
+    {
+        kprint!  ("allocator init: ");
+        ALLOCATOR.initialize();
+        kprintln!("OK");
+    }
+
+    {
+        kprintln!("mmu init");
         kprintln!("{:?}", aarch64::AArch64::new());
         kprintln!("MAIR_EL1: {:?}", aarch64::MemoryAttributeIndirectionRegister::el1());
         mmu::init_mmu();
@@ -125,23 +130,18 @@ pub extern "C" fn kernel_main() -> ! {
     }
 
     {
-        kprint!("allocator init: ");
-        ALLOCATOR.initialize();
-        kprintln!("OK");
-    }
-
-    if false {
+        kprint!("allocator test: ");
         use alloc::string::{String, ToString};
         let mut fuck: String = "##fuck".to_string();
-        for n in 0..512 {
+        for _ in 0..12 {
             fuck += " fuck";
         }
         fuck += "##";
         kprintln!("{:p}: `{}`", fuck.as_ptr(), fuck);
+        kprintln!("------------------");
     }
 
     //loop {}
-
 
     if true {
         use vfat::traits::*;
@@ -149,14 +149,6 @@ pub extern "C" fn kernel_main() -> ! {
         kprint!("file system init: ");
         FILE_SYSTEM.initialize();
         kprintln!("OK");
-
-        /*
-        let vfat = FILE_SYSTEM.0.lock().unwrap().as_ref().unwrap().clone();
-        let entries = vfat::vfat::Dir::root(vfat).entries();
-        for e in entries.unwrap() {
-            kprintln!("  `{}`", e.name());
-        }
-        */
 
         match FILE_SYSTEM.open_dir("").and_then(|e| e.entries()) {
             Ok(entries) => {

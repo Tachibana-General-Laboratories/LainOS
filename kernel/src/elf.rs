@@ -1,3 +1,4 @@
+#![allow(unused_imports)]
 use core::slice::from_raw_parts;
 use core::mem::size_of;
 use alloc::Vec;
@@ -7,8 +8,6 @@ use sys::io;
 use sys::VecExt;
 
 use vm::{self, VirtualAddr};
-
-const PAGESZ: usize = 4096;
 
 const SIZEOF_IDENT: usize = 16;
 
@@ -93,34 +92,44 @@ impl ProgramHeader {
         ProgramFlags::from_bits_truncate(self.p_flags)
     }
 
-    pub fn is_readable(&self) -> bool {
+    pub fn is_read(&self) -> bool {
         self.flags().contains(ProgramFlags::R)
     }
-    pub fn is_writable(&self) -> bool {
+    pub fn is_write(&self) -> bool {
         self.flags().contains(ProgramFlags::W)
     }
     pub fn is_executable(&self) -> bool {
         self.flags().contains(ProgramFlags::X)
     }
 
-    pub fn check_vaddr(&self, page_size: usize) -> bool {
-        (self.p_vaddr % page_size as u64) != 0 &&
+    pub fn check_vaddr(&self, align: usize) -> bool {
+        (self.p_vaddr % align as u64) != 0 &&
         self.p_vaddr + self.p_memsz < self.p_vaddr
     }
 
+    /*
     pub fn area(&self) -> vm::Area {
         let start = self.p_vaddr;
         let end = self.p_vaddr + self.p_memsz;
         vm::Area {
             start: VirtualAddr::from(start as *mut u8),
             end: VirtualAddr::from(end as *mut u8),
-            readable: self.is_readable(),
-            writable: self.is_writable(),
+            readable: self.is_read(),
+            writable: self.is_write(),
             executable: self.is_executable(),
         }
     }
+    */
+
+    /*
+    pub fn file_range(&self) -> (usize, usize) {
+    }
+    pub fn vm_range(&self) -> (usize, usize) {
+    }
+    */
 }
 
+/*
 
 pub fn spawn<F: File>(file: &mut F, aux: &[u8]) -> io::Result<()> {
     //start addr: 0x80000
@@ -170,3 +179,4 @@ pub fn spawn<F: File>(file: &mut F, aux: &[u8]) -> io::Result<()> {
 
     Ok(())
 }
+*/

@@ -57,10 +57,7 @@ SECTIONS {
         . = . + 0x400;
         _stack_core3_el2 = .;
 
-        . = ALIGN(4096);
-        _ttbr_start = .;
-        . = . + 4096 * 6;
-
+        . = ALIGN(32);
         __bss_end = .;
     }
 

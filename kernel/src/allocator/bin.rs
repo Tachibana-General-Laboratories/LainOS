@@ -81,7 +81,7 @@ impl Allocator {
                 return Err(AllocErr);
             }
 
-            let ptr = mem::replace(&mut self.current, end);
+            let _ptr = mem::replace(&mut self.current, end);
             //self.recycle(ptr, start - ptr);
 
             start
