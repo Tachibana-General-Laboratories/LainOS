@@ -3,7 +3,7 @@ use core::ptr::{Unique, NonNull};
 
 use ALLOCATOR;
 use alloc::allocator::{Alloc, Layout};
-use vm::PhysicalAddr;
+use vm::{PhysicalAddr, kernel_into_physical};
 
 /// A process stack. The default size is 1M1B with an alignment of 16 bytes.
 pub struct Stack {
@@ -41,12 +41,12 @@ impl Stack {
 
     /// Returns the physical address of top of the stack.
     pub fn top(&self) -> PhysicalAddr {
-        unsafe { self.as_mut_ptr().add(Self::SIZE).into() }
+        unsafe { kernel_into_physical(self.as_mut_ptr().add(Self::SIZE)) }
     }
 
     /// Returns the physical address of bottom of the stack.
     pub fn bottom(&self) -> PhysicalAddr {
-        unsafe { self.as_mut_ptr().into() }
+        unsafe { kernel_into_physical(self.as_mut_ptr()) }
     }
 }
 

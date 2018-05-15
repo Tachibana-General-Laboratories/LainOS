@@ -3,16 +3,9 @@ name = "kernel"
 version = "0.1.0"
 
 [dependencies]
-#spin = "*"
-#slab_allocator = "0.3.0"
-
 vfat = { path = "../vfat", features = [] }
 sys = { path = "../sys" }
 pi = { path = "../pi", features = [] }
-#pi = { path = "../pi" }
-
-#log = { version = "0.4", features = ["max_level_trace", "release_max_level_warn"] }
-
 
 [dependencies.bitflags]
 version = "1"

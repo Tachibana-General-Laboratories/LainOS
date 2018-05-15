@@ -9,7 +9,7 @@ mod tests;
 
 use sys::Mutex;
 use pi::atags::Atags;
-use core::alloc::{Alloc, GlobalAlloc, AllocErr, Layout, Opaque};
+use core::alloc::{self, Alloc, AllocErr, Layout, Opaque};
 use core::ptr::NonNull;
 
 /// Thread-safe (locking) wrapper around a particular memory allocator.
@@ -32,10 +32,15 @@ impl Allocator {
     /// Panics if the system's memory map could not be retrieved.
     pub fn initialize(&self) {
         let (start, end) = memory_map().expect("failed to find memory map");
-        let size = end - start;
-        let heap = imp::Allocator::new(start, size);
+        let heap = imp::Allocator::new(start, end);
         *self.0.lock().unwrap() = Some(heap);
     }
+
+    /*
+    pub fn remap(&self, mask: usize) {
+        self.0.lock().unwrap().as_mut().expect("allocator uninitialized").remap(mask)
+    }
+    */
 }
 
 unsafe impl<'a> Alloc for &'a Allocator {
@@ -81,7 +86,7 @@ unsafe impl<'a> Alloc for &'a Allocator {
     }
 }
 
-unsafe impl<'a> GlobalAlloc for Allocator {
+unsafe impl<'a> alloc::GlobalAlloc for Allocator {
     unsafe fn alloc(&self, layout: Layout) -> *mut Opaque {
         let p = self.0.lock().unwrap().as_mut().expect("allocator uninitialized").alloc(layout);
         if let Ok(p) = p {
@@ -115,12 +120,6 @@ fn memory_map() -> Option<(usize, usize)> {
         .max()
         .unwrap_or(0x4000_0000);
 
-    //let start = start   | 0xFFFFFF80_00000000;
-    //let end = end       | 0xFFFFFF80_00000000;
-    //
-    //let start = start   | 0xFFFF_0000_0000_0000;
-    //let end = end       | 0xFFFF_0000_0000_0000;
-    //let start = start   | 0xFFFF_FFFF_0000_0000;
-    //let end = end       | 0xFFFF_FFFF_0000_0000;
+    //Some((start | ::vm::KERNEL_SPACE_MAKS, end | ::vm::KERNEL_SPACE_MAKS))
     Some((start, end))
 }

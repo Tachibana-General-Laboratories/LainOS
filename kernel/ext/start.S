@@ -166,65 +166,72 @@ go_main:
 .endm
 
 context_save:
-    sub     SP, SP, #272
+    sub     SP, SP, #288
 
     stp     x1 , x2 , [SP, #32 ]
-    stp     x3 , x4 , [SP, #48 ]
-    stp     x5 , x6 , [SP, #64 ]
-    stp     x7 , x8 , [SP, #80 ]
-    stp     x9 , x10, [SP, #96 ]
-    stp     x11, x12, [SP, #112]
-    stp     x13, x14, [SP, #128]
-    stp     x15, x16, [SP, #144]
-    stp     x17, x18, [SP, #160]
-    stp     x19, x20, [SP, #176]
-    stp     x21, x22, [SP, #192]
-    stp     x23, x24, [SP, #208]
-    stp     x25, x26, [SP, #224]
-    stp     x27, x28, [SP, #240]
-    stp     x29, xzr, [SP, #256]
+    stp     x1 , x2 , [SP, #48 ]
+    stp     x3 , x4 , [SP, #64 ]
+    stp     x5 , x6 , [SP, #80 ]
+    stp     x7 , x8 , [SP, #96 ]
+    stp     x9 , x10, [SP, #112]
+    stp     x11, x12, [SP, #128]
+    stp     x13, x14, [SP, #144]
+    stp     x15, x16, [SP, #160]
+    stp     x17, x18, [SP, #176]
+    stp     x19, x20, [SP, #192]
+    stp     x21, x22, [SP, #208]
+    stp     x23, x24, [SP, #224]
+    stp     x25, x26, [SP, #240]
+    stp     x27, x28, [SP, #256]
+    stp     x29, xzr, [SP, #272]
 
     // TODO: q31..q0
 
-    mrs     x1, TPIDR_EL0
-    mrs     x2, SP_EL0
-    mrs     x3, SPSR_EL1
-    mrs     x4, ELR_EL1
+    mrs     x1, ELR_EL1
+    mrs     x2, SPSR_EL1
+    mrs     x3, SP_EL0
+    mrs     x4, TPIDRRO_EL0
 
-    stp     x4, x3, [SP, #0]
-    stp     x2, x1, [SP, #16]
+    mrs     x5, TTBR0_EL1
+    mov     x6, xzr
+
+    stp     x1, x2, [SP, #0]
+    stp     x3, x4, [SP, #16]
+    stp     x5, x6, [SP, #32]
 
     ret
 
 .global context_restore
 context_restore:
-    ldp     x4, x3, [SP, #0]
-    ldp     x2, x1, [SP, #16]
+    ldp     x1, x2, [SP, #0]
+    ldp     x3, x4, [SP, #16]
+    ldp     x5, x6, [SP, #32]
 
-    msr     TPIDR_EL0, x1
-    msr     SP_EL0, x2
-    msr     SPSR_EL1, x3
-    msr     ELR_EL1, x4
+    msr     ELR_EL1, x1
+    msr     SPSR_EL1, x2
+    msr     SP_EL0, x3
+    msr     TPIDRRO_EL0, x4
+    msr     TTBR0_EL1, x5
 
     // TODO: q31..q0
 
-    ldp     x1 , x2 , [SP, #32 ]
-    ldp     x3 , x4 , [SP, #48 ]
-    ldp     x5 , x6 , [SP, #64 ]
-    ldp     x7 , x8 , [SP, #80 ]
-    ldp     x9 , x10, [SP, #96 ]
-    ldp     x11, x12, [SP, #112]
-    ldp     x13, x14, [SP, #128]
-    ldp     x15, x16, [SP, #144]
-    ldp     x17, x18, [SP, #160]
-    ldp     x19, x20, [SP, #176]
-    ldp     x21, x22, [SP, #192]
-    ldp     x23, x24, [SP, #208]
-    ldp     x25, x26, [SP, #224]
-    ldp     x27, x28, [SP, #240]
-    ldp     x29, xzr, [SP, #256]
+    ldp     x1 , x2 , [SP, #48 ]
+    ldp     x3 , x4 , [SP, #64 ]
+    ldp     x5 , x6 , [SP, #80 ]
+    ldp     x7 , x8 , [SP, #96 ]
+    ldp     x9 , x10, [SP, #112]
+    ldp     x11, x12, [SP, #128]
+    ldp     x13, x14, [SP, #144]
+    ldp     x15, x16, [SP, #160]
+    ldp     x17, x18, [SP, #176]
+    ldp     x19, x20, [SP, #192]
+    ldp     x21, x22, [SP, #208]
+    ldp     x23, x24, [SP, #224]
+    ldp     x25, x26, [SP, #240]
+    ldp     x27, x28, [SP, #256]
+    ldp     x29, xzr, [SP, #272]
 
-    add     SP, SP, #272
+    add     SP, SP, #288
 
     ret
 

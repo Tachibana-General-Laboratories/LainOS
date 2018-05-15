@@ -1,6 +1,5 @@
 use sys::io;
 use vfat::traits::BlockDevice;
-use alloc::string::ToString;
 
 use pi::common::spin_sleep_us;
 

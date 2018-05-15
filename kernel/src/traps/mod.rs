@@ -50,16 +50,12 @@ pub extern fn handle_exception(info: Info, esr: u32, tf: &mut TrapFrame) {
 
     let syndrome = Syndrome::from(esr as u32);
     let ctl = Controller::new();
-    if info.source == LowerAArch64 {
-        match info.kind {
+    match info.source {
+        LowerAArch64 => match info.kind {
             Synchronous => {
                 match syndrome {
                     Syndrome::Svc(num) => return handle_syscall(num, tf),
-                    Syndrome::Brk(num) => {
-                        kprintln!("--- BRK {:?} at {:08X}", num, tf.elr);
-                        tf.elr += 4;
-                        return;
-                    }
+                    Syndrome::Brk(num) => return handle_brk(num, tf),
                     _ => (),
                 }
             }
@@ -74,22 +70,14 @@ pub extern fn handle_exception(info: Info, esr: u32, tf: &mut TrapFrame) {
             Irq if ctl.is_pending(Uart  ) => return handle_irq(Uart  , tf),
 
             _ => (),
-        }
+        },
+        _ => (),
     }
+    panic!("IT'S A TRAP: {:?} {:?} {:?} esr: {:08X} far: {:X}\n{:?}",
+            info.source, info.kind, syndrome, esr, ::aarch64::far_el1(), tf);
+}
 
-    /*
-    if info.source == CurrentSpElx && info.kind == Synchronous {
-        match syndrome {
-            Syndrome::Brk(num) => {
-                kprintln!("!!! BRK EL1 {:?} at {:08X}", num, tf.elr);
-                tf.elr += 4;
-                return;
-            }
-            _ => (),
-        }
-    }
-    */
-
-    panic!("IT'S A TRAP: {:?} {:?} {:?} esr: {:08x}\n{:?}",
-           info.source, info.kind, syndrome, esr, tf);
+fn handle_brk(num: u16, tf: &mut TrapFrame) {
+    kprintln!("--- BRK {:?} at {:08X}", num, tf.elr);
+    tf.elr += 4;
 }

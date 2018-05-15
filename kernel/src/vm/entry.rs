@@ -41,6 +41,17 @@ bitflags! {
         const NS = 1 << 5;
         const ATTR_INDX = 0b111 << 2;
 
+        const ATTR_0 = 0b000 << 2;
+        const ATTR_1 = 0b001 << 2;
+        const ATTR_2 = 0b010 << 2;
+        const ATTR_3 = 0b011 << 2;
+
+        const ATTR_4 = 0b100 << 2;
+        const ATTR_5 = 0b101 << 2;
+        const ATTR_6 = 0b110 << 2;
+        const ATTR_7 = 0b111 << 2;
+
+
         const AP_RO = 1 << 7;
         const AP_EL0 = 1 << 6;
 

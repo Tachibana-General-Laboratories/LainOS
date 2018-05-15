@@ -5,7 +5,7 @@ use core::ops::{Index, IndexMut};
 use sys::volatile::Volatile;
 use sys::volatile::prelude::*;
 
-use vm::{Entry, VirtualAddr};
+use vm::{Entry, VirtualAddr, PhysicalAddr};
 
 #[repr(align(4096))]
 #[derive(Clone)]
@@ -67,20 +67,14 @@ impl<L: Level> Table<L> {
 impl<L: Level> Table<L>
     where L::NextLevel: Level
 {
-    /*
-    pub unsafe fn next_table(&mut self, addr: VirtualAddr) -> Option<&mut Table<L::NextLevel>> {
-        self[addr].read().as_table::<L::NextLevel>()
-    }
-    */
-
     pub unsafe fn next_table_or<'a, F>(&'a mut self, addr: VirtualAddr, f: F)
         -> Option<&'a mut Table<L::NextLevel>>
-        where F: FnOnce() -> Option<(Entry, &'a mut Table<L::NextLevel>)>
+        where F: FnOnce() -> Option<(Entry, (&'a mut Table<L::NextLevel>, PhysicalAddr))>
     {
         self[addr].read().as_table::<L::NextLevel>()
             .or_else(|| {
-                let (attr, next) = f()?;
-                self[addr].write(Entry::table((next as *mut _).into()) | attr);
+                let (attr, (next, ptr)) = f()?;
+                self[addr].write(Entry::table(ptr) | attr);
                 Some(next)
             })
     }
@@ -98,29 +92,3 @@ impl<L: Level> IndexMut<VirtualAddr> for Table<L> {
         self.get_mut(L::to_index(addr))
     }
 }
-
-/*
-impl<L: Level> Drop for Table<L> {
-    fn drop(&mut self) {
-        for entry in self.entries.iter().filter(|e| e.need_drop()) {
-            if mem::size_of::<L::Block>() == 0 {
-                drop(unsafe {
-                    Box::from_raw(entry.addr().as_mut_ptr() as *mut [u8; PAGESZ])
-                })
-            } else if entry.is_block() {
-                drop(unsafe {
-                    let addr = entry.addr().as_mut_ptr();
-                    let addr = addr as *mut L::Block;
-                    Box::from_raw(addr)
-                })
-            } else {
-                drop(unsafe {
-                    let addr = entry.addr().as_mut_ptr();
-                    let addr = addr as *mut Table<L::NextLevel>;
-                    Box::from_raw(addr)
-                })
-            }
-        }
-    }
-}
-*/

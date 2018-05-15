@@ -2,6 +2,7 @@ SECTIONS {
     . = 0x80000;
     .text : {
         KEEP(*(.text.boot))
+        . = . + 0x1000;
         *(.text .text.* .gnu.linkonce.t*)
     }
 
@@ -25,6 +26,11 @@ SECTIONS {
 
         . = ALIGN(16);
 
+        _stack_core0_start = .;
+        . = . + 0x00100000;
+        _stack_core0_el1 = .;
+
+		/*
         _stack_core0_start = .;
         . = . + 0x4000;
         _stack_core0_el0 = .;
@@ -56,6 +62,7 @@ SECTIONS {
         _stack_core3_el1 = .;
         . = . + 0x400;
         _stack_core3_el2 = .;
+		*/
 
         . = ALIGN(32);
         __bss_end = .;

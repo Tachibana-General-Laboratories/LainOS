@@ -1,3 +1,5 @@
+use vm::{PhysicalAddr, kernel_into_physical};
+
 pub type EntryFn = unsafe extern "C" fn () -> !;
 
 #[repr(C)]
@@ -6,7 +8,10 @@ pub struct TrapFrame {
     pub elr: u64,
     pub spsr: u64,
     pub sp: u64,
-    pub tpidr: u64,
+    pub pid: u64,
+
+    pub ttbr: u64,
+    pub reserved_1: u64,
 
     // TODO: pub q31_q0: [u128; 32],
 
@@ -40,7 +45,7 @@ pub struct TrapFrame {
     pub x28: u64,
     pub x29: u64,
 
-    pub reserved: u64,
+    pub reserved_2: u64,
 
     pub x30: u64, // lr
     pub x0: u64,
@@ -48,8 +53,13 @@ pub struct TrapFrame {
 
 impl TrapFrame {
     pub fn set_elr(&mut self, entry: EntryFn) {
-        let entry = entry as *const u8 as u64;
+        let entry = kernel_into_physical(entry as *mut u8).as_u64();
         assert_eq!(entry % 4, 0, "PC must be proprely aligned");
         self.elr = entry;
+    }
+
+    pub fn set_ttbr(&mut self, asid: u16, addr: PhysicalAddr) {
+        let asid = (asid as u64) << 48;
+        self.ttbr = asid | addr.as_u64() | 1;
     }
 }

@@ -177,10 +177,19 @@ impl Gpio<Uninitialized> {
     ///
     /// Panics if `pin` > `53`.
     pub fn new(pin: u8) -> Self {
+        unsafe { Self::new_from(GPIO_BASE, pin) }
+    }
+
+    /// Returns a new `GPIO` structure for pin number `pin`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `pin` > `53`.
+    pub unsafe fn new_from(base: usize, pin: u8) -> Self {
         if pin > 53 {
             panic!("Gpio::new(): pin {} exceeds maximum of 53", pin);
         }
-        let registers = unsafe { &mut *(GPIO_BASE as *mut Registers) };
+        let registers = &mut *(base as *mut Registers);
         Self { registers, pin, _state: PhantomData }
     }
 

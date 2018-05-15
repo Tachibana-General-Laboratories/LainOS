@@ -1,5 +1,5 @@
 use pi::uart::MiniUart;
-use core::fmt::{self, Write, Arguments};
+use core::fmt::{Write, Arguments};
 
 #[lang = "eh_personality"]
 pub extern "C" fn eh_personality() {}
@@ -19,7 +19,7 @@ pub extern fn panic_fmt(msg: Arguments, file: &'static str, line: u32, col: u32)
 #[no_mangle]
 #[lang = "oom"]
 pub unsafe extern "C" fn rust_oom() -> ! {
-    ::core::intrinsics::abort()
+    panic!("OOM")
 }
 
 #[no_mangle]

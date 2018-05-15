@@ -3,7 +3,7 @@ use sys::volatile::prelude::*;
 use sys::volatile::{Volatile, ReadVolatile};
 
 /// The base address for the ARM system timer registers.
-const TIMER_REG_BASE: usize = IO_BASE + 0x3000;
+pub const TIMER_REG_BASE: usize = IO_BASE + 0x3000;
 
 #[repr(C)]
 #[allow(non_snake_case)]
@@ -22,7 +22,11 @@ pub struct Timer {
 impl Timer {
     /// Returns a new instance of `Timer`.
     pub fn new() -> Self {
-        let registers = unsafe { &mut *(TIMER_REG_BASE as *mut Registers) };
+        unsafe { Self::new_from(TIMER_REG_BASE) }
+    }
+
+    pub unsafe fn new_from(base: usize) -> Self {
+        let registers = &mut *(base as *mut Registers);
         Self { registers }
     }
 

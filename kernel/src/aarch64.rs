@@ -1,5 +1,42 @@
 use core::fmt;
 
+pub fn flush_user_tlb() {
+    //flush_tlb_asid(1);
+    flush_tlb_all()
+}
+
+pub fn flush_tlb_all() {
+    unsafe {
+        asm!("
+            dsb ishst
+            tlbi vmalle1is
+            dsb ish
+            isb
+            " :::: "volatile");
+    }
+}
+
+fn flush_tlb_asid(asid: u16) {
+    let asid = (asid as u64) << 48;
+    unsafe {
+        asm!("
+            dsb     ishst
+            tlbi    aside1is, $0
+            dsb     ish
+            isb
+            " :: "r"(asid) :: "volatile")
+    }
+}
+
+#[inline(always)]
+pub fn far_el1() -> u64 {
+    let r: u64;
+    unsafe {
+        asm!("mrs $0, FAR_EL1" : "=r"(r));
+    }
+    r
+}
+
 /// Returns the current stack pointer.
 #[inline(always)]
 pub fn sp() -> *const u8 {
@@ -330,6 +367,23 @@ pub fn set_mair_el1(r: [u8; 8]) {
     }
 }
 
+pub fn ttbr0_el1() -> u64 {
+    let r: u64;
+    unsafe { asm!("mrs $0, TTBR0_EL1" : "=r"(r)) }
+    r
+}
+
+pub fn set_ttbr0_el1(asid: u16, ttbr: u64, cnp: bool) {
+    let addr = ((asid as u64) << 48) | ttbr | cnp as u64;
+    unsafe { asm!("msr TTBR0_EL1, $0" :: "r"(addr) :: "volatile") }
+}
+
+pub fn set_ttbr1_el1(asid: u16, ttbr: u64, cnp: bool) {
+    let addr = ((asid as u64) << 48) | ttbr | cnp as u64;
+    unsafe { asm!("msr TTBR1_EL1, $0" :: "r"(addr) :: "volatile") }
+}
+
+/*
 enum Outer {
     WriteThroughTransient,
     NonCacheable,
@@ -337,6 +391,7 @@ enum Outer {
     WriteThroughNonTransient,
     WriteBackNonTransient,
 }
+*/
 
 fn u64_to_u8arr(r: u64) -> [u8; 8] {
     [

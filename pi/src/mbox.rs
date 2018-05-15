@@ -199,9 +199,12 @@ pub struct Mailbox {
 
 impl Mailbox {
     pub fn new() -> Self {
-        Self {
-            registers: unsafe { &mut *(VIDEOCORE_MBOX as *mut Registers) },
-        }
+        unsafe { Self::new_from(VIDEOCORE_MBOX) }
+    }
+
+    pub unsafe fn new_from(base: usize) -> Self {
+        let registers = &mut *(base as *mut Registers);
+        Self { registers }
     }
 
     /// This will post and execute the given variadic data onto the tags channel

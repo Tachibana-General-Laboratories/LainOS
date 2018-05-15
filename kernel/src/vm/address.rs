@@ -16,6 +16,12 @@ macro_rules! impl_for {
             }
         }
 
+        impl From<usize> for $T {
+            fn from(raw: usize) -> $T {
+                $T(raw)
+            }
+        }
+
         impl $T {
             /// Returns the inner address of `self`.
             pub const fn as_ptr(&self) -> *const u8 {

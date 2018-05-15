@@ -1,10 +1,9 @@
 use alloc::VecDeque;
-use core::mem;
 
 use sys::Mutex;
 use process::{Process, State, Id};
 use traps::TrapFrame;
-use aarch64::wait_for_interrupt;
+use aarch64;
 
 /// The `tick` time.
 pub const TICK: u32 = 10 * 1000;
@@ -50,19 +49,32 @@ impl GlobalScheduler {
             let mut init = Process::with_entry(el0_init).unwrap();
             let tf = init.tf_u64();
             self.add(init).expect("add proc 'init'");
-            self.add(Process::with_entry(el0_other).unwrap()).expect("add proc 'other'");
             self.add(Process::with_entry(el0_shell).unwrap()).expect("add proc 'shell'");
+            self.add(Process::with_entry(el0_other).unwrap()).expect("add proc 'other'");
             tf
         };
 
         unsafe {
             asm!("
-            mov SP, $0
-            bl  context_restore
-            ldr x0, =_stack_core0_el1
-            mov SP, x0
-            mov x0, #0
-            mov x30, #0
+            mov     SP, $0
+            bl      context_restore
+            ldr     x0, =_stack_core0_el1
+            mov     SP, x0
+
+            /*
+            mrs     x0, ELR_EL1
+            movk    x0, #0x0000, LSL #48
+            movk    x0, #0x0000, LSL #32
+            msr     ELR_EL1, x0
+
+            mrs     x0, SP_EL0
+            movk    x0, #0x0000, LSL #48
+            movk    x0, #0x0000, LSL #32
+            msr     SP_EL0, x0
+            */
+
+            mov     x0, xzr
+            mov     x30, xzr
             eret
             "
             :: "r"(tf)
@@ -108,7 +120,7 @@ impl Scheduler {
             }
         };
 
-        process.trap_frame.tpidr = id.as_u64();
+        process.set_id(Some(id));
         self.processes.push_back(process);
 
         self.last_id = Some(id);
@@ -156,9 +168,10 @@ impl Scheduler {
                 *tf = *process.trap_frame;
                 self.current = process.id();
                 self.processes.push_front(process);
+                aarch64::flush_user_tlb();
                 return self.current;
             }
-            wait_for_interrupt();
+            aarch64::wait_for_interrupt();
         }
     }
 }

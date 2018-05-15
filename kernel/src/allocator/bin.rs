@@ -1,5 +1,5 @@
 use core::mem;
-use core::alloc::{AllocErr, Layout, Opaque};
+use core::alloc::{Alloc, AllocErr, Layout, Opaque};
 use core::ptr::NonNull;
 
 use allocator::util::*;
@@ -38,13 +38,15 @@ impl Allocator {
             }
         }
     }
+}
 
-    fn bin_from_layout(layout: Layout) -> usize {
-        align_up(layout.size(), layout.align())
-            .next_power_of_two()
-            .trailing_zeros() as usize - 3
-    }
+fn bin_from_layout(layout: Layout) -> usize {
+    align_up(layout.size(), layout.align())
+        .next_power_of_two()
+        .trailing_zeros() as usize - 3
+}
 
+unsafe impl<'a> Alloc for Allocator {
     /// Allocates memory. Returns a pointer meeting the size and alignment
     /// properties of `layout.size()` and `layout.align()`.
     ///
@@ -65,8 +67,8 @@ impl Allocator {
     /// Returning `Err` indicates that either memory is exhausted
     /// (`AllocError::Exhausted`) or `layout` does not meet this allocator's
     /// size or alignment constraints (`AllocError::Unsupported`).
-    pub fn alloc(&mut self, layout: Layout) -> Result<NonNull<Opaque>, AllocErr> {
-        let bin = Self::bin_from_layout(layout);
+    unsafe fn alloc(&mut self, layout: Layout) -> Result<NonNull<Opaque>, AllocErr> {
+        let bin = bin_from_layout(layout);
         if bin >= BIN_COUNT {
             return Err(AllocErr);
         }
@@ -78,6 +80,7 @@ impl Allocator {
             let end = align_up(start + layout.size(), END_ALIGN);
 
             if end >= self.end {
+                ::console::kprintln!("alloc {:x}-{:x} @end: {:x}", start, end, self.end);
                 return Err(AllocErr);
             }
 
@@ -87,9 +90,7 @@ impl Allocator {
             start
         };
 
-        //::console::kprintln!("alloc {:x} {:?}", addr, layout);
-
-        unsafe { Ok(NonNull::new_unchecked(addr as *mut u8).as_opaque()) }
+        Ok(NonNull::new_unchecked(addr as *mut u8).as_opaque())
     }
 
     /// Deallocates the memory referenced by `ptr`.
@@ -105,9 +106,8 @@ impl Allocator {
     ///
     /// Parameters not meeting these conditions may result in undefined
     /// behavior.
-    pub fn dealloc(&mut self, ptr: NonNull<Opaque>, layout: Layout) {
-        //::console::kprintln!("dealloc {:?} {:?}", ptr, layout);
-        let bin = Self::bin_from_layout(layout);
-        unsafe { self.bin[bin].push(ptr.as_ptr() as *mut usize); }
+    unsafe fn dealloc(&mut self, ptr: NonNull<Opaque>, layout: Layout) {
+        let bin = bin_from_layout(layout);
+        self.bin[bin].push(ptr.as_ptr() as *mut usize);
     }
 }

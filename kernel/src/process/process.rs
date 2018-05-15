@@ -58,6 +58,7 @@ impl Process {
             let state = State::Ready;
             let mut trap_frame: Box<TrapFrame> = Box::new(unsafe { mem::zeroed() });
             trap_frame.sp = stack.top().as_u64();
+            trap_frame.ttbr = ::aarch64::ttbr0_el1();
             Self { trap_frame, stack, state }
         })
     }
@@ -111,13 +112,13 @@ impl Process {
 
     pub fn set_id(&mut self, id: Option<Id>) {
         if let Some(id) = id {
-            self.trap_frame.tpidr = id.as_u64();
+            self.trap_frame.pid = id.as_u64();
         } else {
-            self.trap_frame.tpidr = 0;
+            self.trap_frame.pid = 0;
         }
     }
 
     pub fn id(&self) -> Option<Id> {
-        Id::new(self.trap_frame.tpidr)
+        Id::new(self.trap_frame.pid)
     }
 }

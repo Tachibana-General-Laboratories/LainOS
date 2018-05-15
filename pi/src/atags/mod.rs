@@ -4,7 +4,7 @@ mod atag;
 pub use self::atag::*;
 
 /// The address at which the firmware loads the ATAGS.
-const ATAG_BASE: usize = 0x100;
+pub const ATAG_BASE: usize = 0x100;
 
 /// An iterator over the ATAGS on this system.
 pub struct Atags {
@@ -14,7 +14,11 @@ pub struct Atags {
 impl Atags {
     /// Returns an instance of `Atags`, an iterator over ATAGS on this system.
     pub fn get() -> Self {
-        let ptr = unsafe { &*(ATAG_BASE as *const raw::Atag) };
+        unsafe { Self::get_from(ATAG_BASE) }
+    }
+    /// Returns an instance of `Atags`, an iterator over ATAGS on this system.
+    pub unsafe fn get_from(base: usize) -> Self {
+        let ptr = &*(base as *const raw::Atag);
         Self { ptr }
     }
 }
