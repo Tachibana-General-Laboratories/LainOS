@@ -13,6 +13,7 @@
 #![feature(alloc_system, alloc, allocator_api, global_allocator)]
 #![feature(ptr_internals)]
 #![feature(nonzero)]
+#![feature(try_reserve)]
 
 
 #![cfg_attr(not(test), no_std)]
@@ -58,32 +59,14 @@ pub mod allocator;
 #[cfg(not(test))] pub static FILE_SYSTEM: FileSystem = FileSystem::uninitialized();
 #[cfg(not(test))] pub static SCHEDULER: GlobalScheduler = GlobalScheduler::uninitialized();
 
-//const BINARY_START_ADDR: usize = 0x8_0000; // 512kb
-
-/*
-const ADDR_1MB: usize   = 0x0010_0000;
-const ADDR_2MB: usize   = 0x0020_0000;
-const ADDR_4MB: usize   = 0x0040_0000;
-const ADDR_8MB: usize   = 0x0080_0000;
-const ADDR_16MB: usize  = 0x0100_0000;
-const ADDR_32MB: usize  = 0x0200_0000;
-const ADDR_64MB: usize  = 0x0400_0000;
-const ADDR_128MB: usize = 0x0800_0000;
-const ADDR_256MB: usize = 0x1000_0000;
-const ADDR_512MB: usize = 0x2000_0000;
-const ADDR_1GB: usize   = 0x4000_0000;
-const ADDR_2GB: usize   = 0x8000_0000;
-*/
-
-
-#[no_mangle]
 #[cfg(not(test))]
+#[no_mangle]
 pub extern "C" fn kernel_main() -> ! {
     //dbg::hello();
     //dbg::print_atags();
     //dbg::print_memory();
 
-    vm::enable_mmu();
+    vm::initialize();
 
     unsafe {
         asm!("
@@ -109,7 +92,6 @@ pub extern "C" fn kernel_main() -> ! {
 
     ALLOCATOR.initialize();
     //dbg::test_alloc();
-    vm::initialize();
     FILE_SYSTEM.initialize();
     //dbg::test_fs();
     //dbg::test_timers();
@@ -121,7 +103,7 @@ pub extern "C" fn kernel_main() -> ! {
     kprintln!("");
     kprintln!("---- EL0: ----");
 
-    pi::timer::spin_sleep_ms(500);
+    pi::timer::spin_sleep_ms(200);
 
     use pi::interrupt::{Controller, Interrupt};
     use pi::timer::tick_in;
@@ -141,6 +123,7 @@ mod dbg {
         use pi::gpio::Gpio;
         use pi::timer::spin_sleep_ms;
         let mut pin = Gpio::new(16).into_output();
+
         pin.set();
         spin_sleep_ms(500);
         pin.clear();

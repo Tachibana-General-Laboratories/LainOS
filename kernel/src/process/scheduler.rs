@@ -39,6 +39,12 @@ impl GlobalScheduler {
         self.0.lock().unwrap().as_mut().expect("scheduler uninitialized").switch(new_state, tf)
     }
 
+    pub fn current<F>(&self, f: F)
+        where F: FnOnce(&mut Process)
+    {
+        f(self.0.lock().unwrap().as_mut().expect("scheduler uninitialized").current().unwrap())
+    }
+
     /// Initializes the scheduler and starts executing processes in user space
     /// using timer interrupt based preemptive scheduling. This method should
     /// not return under normal conditions.
@@ -61,18 +67,6 @@ impl GlobalScheduler {
             ldr     x0, =_stack_core0_el1
             mov     SP, x0
 
-            /*
-            mrs     x0, ELR_EL1
-            movk    x0, #0x0000, LSL #48
-            movk    x0, #0x0000, LSL #32
-            msr     ELR_EL1, x0
-
-            mrs     x0, SP_EL0
-            movk    x0, #0x0000, LSL #48
-            movk    x0, #0x0000, LSL #32
-            msr     SP_EL0, x0
-            */
-
             mov     x0, xzr
             mov     x30, xzr
             eret
@@ -85,7 +79,7 @@ impl GlobalScheduler {
 }
 
 #[derive(Debug)]
-struct Scheduler {
+pub struct Scheduler {
     processes: VecDeque<Process>,
     current: Option<Id>,
     last_id: Option<Id>,
@@ -99,6 +93,11 @@ impl Scheduler {
             current: None,
             last_id: None,
         }
+    }
+
+    pub fn current(&mut self) -> Option<&mut Process> {
+        let id = self.current;
+        self.processes.iter_mut().find(|p| p.id() == id)
     }
 
     /// Adds a process to the scheduler's queue and returns that process's ID if
@@ -148,6 +147,8 @@ impl Scheduler {
                 self.current = None;
                 if !is_exit {
                     self.processes.push_back(process);
+                } else {
+                    ::console::kprintln!("exited");
                 }
             } else {
                 self.processes.push_front(process);
@@ -168,7 +169,6 @@ impl Scheduler {
                 *tf = *process.trap_frame;
                 self.current = process.id();
                 self.processes.push_front(process);
-                aarch64::flush_user_tlb();
                 return self.current;
             }
             aarch64::wait_for_interrupt();

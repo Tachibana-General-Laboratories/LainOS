@@ -1,4 +1,4 @@
-use vm::{PhysicalAddr, kernel_into_physical};
+use vm::{PhysicalAddr, LOWER_SPACE_MASK};
 
 pub type EntryFn = unsafe extern "C" fn () -> !;
 
@@ -53,7 +53,7 @@ pub struct TrapFrame {
 
 impl TrapFrame {
     pub fn set_elr(&mut self, entry: EntryFn) {
-        let entry = kernel_into_physical(entry as *mut u8).as_u64();
+        let entry = (entry as usize & LOWER_SPACE_MASK) as u64;
         assert_eq!(entry % 4, 0, "PC must be proprely aligned");
         self.elr = entry;
     }

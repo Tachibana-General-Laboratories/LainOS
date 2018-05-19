@@ -5,7 +5,7 @@ version = "0.1.0"
 [dependencies]
 vfat = { path = "../vfat", features = [] }
 sys = { path = "../sys" }
-pi = { path = "../pi", features = [] }
+pi = { path = "../pi", features = ["higher_half"] }
 
 [dependencies.bitflags]
 version = "1"

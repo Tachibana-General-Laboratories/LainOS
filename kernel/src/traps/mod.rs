@@ -9,7 +9,7 @@ pub use self::trap_frame::TrapFrame;
 pub use self::syscall::Error;
 
 use console::kprintln;
-use self::syndrome::Syndrome;
+use self::syndrome::{Syndrome, Fault};
 use self::irq::handle_irq;
 use self::syscall::handle_syscall;
 
@@ -56,6 +56,8 @@ pub extern fn handle_exception(info: Info, esr: u32, tf: &mut TrapFrame) {
                 match syndrome {
                     Syndrome::Svc(num) => return handle_syscall(num, tf),
                     Syndrome::Brk(num) => return handle_brk(num, tf),
+                    Syndrome::DataAbort { kind, level } =>
+                        return handle_page_fault(kind, level, tf, ::aarch64::far_el1()),
                     _ => (),
                 }
             }
@@ -80,4 +82,17 @@ pub extern fn handle_exception(info: Info, esr: u32, tf: &mut TrapFrame) {
 fn handle_brk(num: u16, tf: &mut TrapFrame) {
     kprintln!("--- BRK {:?} at {:08X}", num, tf.elr);
     tf.elr += 4;
+}
+
+fn handle_page_fault(kind: Fault, level: u8, tf: &mut TrapFrame, far: u64) {
+    use self::Fault::*;
+    match kind {
+        Translation => {
+            kprintln!("### Translation[{}]: {:X}", level, far);
+            ::SCHEDULER.current(|process| {
+                process.mm.page_fault(far);
+            });
+        }
+        _ => panic!("PAGE FALUT: {:?}[{}] far: {:X}\n{:?}", kind, level, far, tf),
+    }
 }

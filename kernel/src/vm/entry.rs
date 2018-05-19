@@ -1,4 +1,4 @@
-use vm::{Table, Level, PhysicalAddr};
+use vm::PhysicalAddr;
 
 bitflags! {
     pub struct Entry: u64 {
@@ -8,7 +8,6 @@ bitflags! {
         const PAGE = 0b11;
         const TABLE = 0b11;
         const BLOCK = 0b01;
-
 
         const USER_MASK     = 0x0780_0000_0000_0000;
         const UPPER_MASK    = 0xFFF0_0000_0000_0000;
@@ -55,8 +54,14 @@ bitflags! {
         const AP_RO = 1 << 7;
         const AP_EL0 = 1 << 6;
 
-        const SH_OUTER = 0b10 << 8;
-        const SH_INNER = 0b11 << 8;
+        const OSH = 0b10 << 8;
+        const ISH = 0b11 << 8;
+
+        const USER_BASE = Self::AF.bits | Self::AP_EL0.bits | Self::ISH.bits;
+        const USER_RO = Self::USER_BASE.bits | Self::XN.bits | Self::PXN.bits | Self::AP_RO.bits;
+        const USER_RW = Self::USER_BASE.bits | Self::XN.bits | Self::PXN.bits;
+        const USER_RX = Self::USER_BASE.bits | Self::AP_RO.bits;
+        const USER_DEV = Self::AF.bits | Self::AP_EL0.bits | Self::OSH.bits | Self::XN.bits | Self::ATTR_1.bits;
     }
 }
 
@@ -73,6 +78,7 @@ impl Entry {
         Self::BLOCK.with_addr(addr)
     }
 
+    /*
     pub unsafe fn as_table<'a, L: Level>(self) -> Option<&'a mut Table<L>> {
         if self.is_table() {
             Some(&mut *(self.addr().as_mut_ptr() as *mut _))
@@ -80,6 +86,7 @@ impl Entry {
             None
         }
     }
+    */
 
     pub fn need_drop(&self) -> bool {
         self.contains(Self::VALID | Self::NEED_DROP)
@@ -111,7 +118,7 @@ impl Entry {
     }
 
     pub fn addr(self) -> PhysicalAddr {
-        PhysicalAddr::from((self & Self::ADDRESS_MASK).bits as *mut u8)
+        ((self & Self::ADDRESS_MASK).bits).into()
     }
     pub fn with_addr(mut self, addr: PhysicalAddr) -> Self {
         self.bits |= (addr.as_u64()) & Self::ADDRESS_MASK.bits;

@@ -73,13 +73,16 @@ pub fn print(s: *const u8, len: usize) -> Result<(), Error> {
         .map_err(|_| Error::Io)
 }
 
-pub fn read_byte() -> Result<u8, Error> {
-    let mut c = CONSOLE.lock().unwrap();
-    if c.has_byte() {
-        Ok(c.read_byte())
-    } else {
-        Ok(0)
-    }
+pub fn read_byte(tf: &mut TrapFrame) {
+    let f = Box::new(move |p: &mut Process| {
+        let mut c = CONSOLE.lock().unwrap();
+        let has = c.has_byte();
+        if has {
+            p.trap_frame.x0 = c.read_byte() as u64;
+        }
+        has
+    });
+    SCHEDULER.switch(State::Waiting(f), tf).expect("sleep");
 }
 
 pub fn exit(code: u32, tf: &mut TrapFrame) {
@@ -97,12 +100,7 @@ pub fn handle_syscall(num: u16, tf: &mut TrapFrame) {
             }
         }
         3 => exit(tf.x0 as u32, tf),
-        4 => {
-            match read_byte() {
-                Ok(byte) => tf.x0 = byte as u64,
-                Err(err) => tf.x7 = err as u64,
-            }
-        }
+        4 => read_byte(tf),
         _ => {
             kprintln!("--- SYSCALL does not exists {:?}, x0-3: {} {} {} {}", num, tf.x0, tf.x1, tf.x2, tf.x3);
             tf.x0 = num as u64;

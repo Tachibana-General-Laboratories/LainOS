@@ -1,8 +1,9 @@
 use core::fmt;
 
 pub fn flush_user_tlb() {
-    //flush_tlb_asid(1);
-    flush_tlb_all()
+    flush_tlb_asid(1);
+    flush_tlb_asid(0);
+    //flush_tlb_all();
 }
 
 pub fn flush_tlb_all() {
@@ -16,7 +17,7 @@ pub fn flush_tlb_all() {
     }
 }
 
-fn flush_tlb_asid(asid: u16) {
+pub fn flush_tlb_asid(asid: u16) {
     let asid = (asid as u64) << 48;
     unsafe {
         asm!("

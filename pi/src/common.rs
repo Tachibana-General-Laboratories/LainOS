@@ -1,6 +1,10 @@
 /// The address where I/O peripherals are mapped to.
-//pub const IO_BASE: usize = 0x3F000000;
-pub const IO_BASE: usize = 0xFFFF_FF80_3F000000;
+pub const IO_BASE_RAW: usize = 0x3F000000;
+
+#[cfg(feature = "higher_half")]
+pub const IO_BASE: usize = 0xFFFFFF80_00000000 | IO_BASE_RAW;
+#[cfg(not(feature = "higher_half"))]
+pub const IO_BASE: usize = IO_BASE_RAW;
 
 /// Generates `pub enums` with no variants for each `ident` passed in.
 pub macro states($($name:ident),*) {

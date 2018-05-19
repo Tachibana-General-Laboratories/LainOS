@@ -9,8 +9,11 @@ mod tests;
 
 use sys::Mutex;
 use pi::atags::Atags;
-use core::alloc::{self, Alloc, AllocErr, Layout, Opaque};
+use core::alloc::{self, Alloc, Layout, Opaque};
 use core::ptr::NonNull;
+use core::mem;
+
+pub use core::alloc::AllocErr;
 
 /// Thread-safe (locking) wrapper around a particular memory allocator.
 #[derive(Debug)]
@@ -101,6 +104,20 @@ unsafe impl<'a> alloc::GlobalAlloc for Allocator {
     }
 }
 
+use alloc::boxed::Box;
+
+pub fn safe_box<T>(x: T) -> Option<Box<T>> {
+    let size = mem::size_of::<T>();
+    let align = mem::align_of::<T>();
+    assert!(size > 0, "zero-sized types not supports");
+    let layout = Layout::from_size_align(size, align).expect("layout create");
+    unsafe {
+        let ptr: *mut T = (&::ALLOCATOR).alloc(layout).ok()?.cast().as_ptr();
+        ptr.write(x);
+        Some(Box::from_raw(ptr))
+    }
+}
+
 extern "C" {
     static _end: u8;
 }
@@ -120,6 +137,7 @@ fn memory_map() -> Option<(usize, usize)> {
         .max()
         .unwrap_or(0x4000_0000);
 
-    //Some((start | ::vm::KERNEL_SPACE_MAKS, end | ::vm::KERNEL_SPACE_MAKS))
-    Some((start, end))
+    use vm::UPPER_SPACE_MASK as MASK;
+
+    Some((start | MASK, end | MASK))
 }

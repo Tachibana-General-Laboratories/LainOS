@@ -5,6 +5,7 @@ use self::syscall::*;
 #[no_mangle]
 pub extern "C" fn el0_other() -> ! {
     println!("I just exit.");
+    //loop {}
     syscall_exit(127);
 }
 
@@ -27,28 +28,32 @@ pub extern "C" fn el0_init() -> ! {
     println!("fuck you shit: {}", 555);
     unsafe { asm!("brk 2" :::: "volatile"); }
 
-    loop {}
+    //loop {}
 
-    use pi::gpio::Gpio;
-    let mut led = Gpio::new(16).into_output();
-    let mut motor = Gpio::new(20).into_output();
-    let mut button = Gpio::new(18).into_input();
+    println!("test GPIO");
 
-    let mut state = false;
+    use pi::gpio::{Gpio, GPIO_BASE};
+    use pi::common::IO_BASE_RAW;
+
+    let mut r = unsafe { Gpio::new_from(IO_BASE_RAW + GPIO_BASE, 21).into_output() };
+    let mut g = unsafe { Gpio::new_from(IO_BASE_RAW + GPIO_BASE, 20).into_output() };
+    let mut b = unsafe { Gpio::new_from(IO_BASE_RAW + GPIO_BASE, 19).into_output() };
+
+    let mut motor = unsafe { Gpio::new_from(IO_BASE_RAW + GPIO_BASE, 26).into_output() };
+    let mut btn = unsafe { Gpio::new_from(IO_BASE_RAW + GPIO_BASE, 16).into_input() };
+
+    let mut led = 0;
 
     loop {
-        state = !button.level() && !state;
-
-        if state {
+        if led & 1 != 0 { r.set() } else { r.clear() }
+        if led & 2 != 0 { g.set() } else { g.clear() }
+        if led & 4 != 0 { b.set() } else { b.clear() }
+        if !btn.level() {
+            led += 1;
             motor.set();
-            led.set();
-            syscall_sleep(50).unwrap();
+            syscall_sleep(5).unwrap();
             motor.clear();
-            led.clear();
-            syscall_sleep(50).unwrap();
-        } else {
-            motor.clear();
-            led.clear();
+            syscall_sleep(100).unwrap();
         }
     }
 }

@@ -213,6 +213,11 @@ context_restore:
     msr     TPIDRRO_EL0, x4
     msr     TTBR0_EL1, x5
 
+    dsb     ishst
+    tlbi    vmalle1is
+    dsb     ish
+    isb
+
     // TODO: q31..q0
 
     ldp     x1 , x2 , [SP, #48 ]

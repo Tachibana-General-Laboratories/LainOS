@@ -2,7 +2,7 @@ use common::IO_BASE;
 use sys::volatile::prelude::*;
 use sys::volatile::{Volatile, ReadVolatile};
 
-pub const INT_BASE: usize = IO_BASE + 0xB000 + 0x200;
+pub const INT_BASE: usize = 0xB000 + 0x200;
 
 #[repr(u32)]
 #[derive(Copy, Clone, PartialEq)]
@@ -41,7 +41,7 @@ pub struct Controller {
 impl Controller {
     /// Returns a new handle to the interrupt controller.
     pub fn new() -> Self {
-        unsafe { Self::new_from(INT_BASE) }
+        unsafe { Self::new_from(IO_BASE + INT_BASE) }
     }
 
     /// Returns a new handle to the interrupt controller.

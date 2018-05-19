@@ -4,6 +4,11 @@ use traps::TrapFrame;
 use process::{State, Stack};
 use alloc::boxed::Box;
 
+use vm::{self, Memory, Area, Prot};
+use pi::common::IO_BASE_RAW;
+
+use allocator::safe_box;
+
 /// Type alias for the type of a process ID.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Id {
@@ -41,10 +46,12 @@ impl fmt::Debug for Id {
 pub struct Process {
     /// The saved trap frame of a process.
     pub trap_frame: Box<TrapFrame>,
-    /// The memory allocation used for the process's stack.
-    pub stack: Stack,
+    // The memory allocation used for the process's stack.
+    //pub stack: Stack,
     /// The scheduling state of the process.
     pub state: State,
+    /// The virtual memory of the process.
+    pub mm: Box<Memory>,
 }
 
 impl Process {
@@ -54,14 +61,33 @@ impl Process {
     /// If enough memory could not be allocated to start the process, returns
     /// `None`. Otherwise returns `Some` of the new `Process`.
     pub fn new() -> Option<Self> {
-        Stack::new().map(|stack| {
-            let state = State::Ready;
-            let mut trap_frame: Box<TrapFrame> = Box::new(unsafe { mem::zeroed() });
-            trap_frame.sp = stack.top().as_u64();
-            trap_frame.ttbr = ::aarch64::ttbr0_el1();
-            Self { trap_frame, stack, state }
-        })
+        let stack_bottom = 4 * 0x4000_0000;
+        let stack_top = stack_bottom + Stack::SIZE;
+
+        let mut trap_frame: Box<TrapFrame> = safe_box(unsafe { mem::zeroed() })?;
+
+        // create MMU translation tables
+        let mut mm = Memory::new()?;
+
+        let start = vm::kernel_start().as_usize();
+        let data = vm::kernel_data().as_usize();
+        let end = vm::kernel_end().as_usize();
+
+        // different for code and data
+        mm.area_rx(Area::new(start, data).map_to(start.into()))?;
+        mm.area_rw(Area::new(data, end).map_to(data.into()))?;
+        // different attributes for device memory
+        mm.area_dev(Area::new(IO_BASE_RAW, 0x4000_0000).map_to(IO_BASE_RAW.into()))?;
+        // different for stack area
+        mm.area_rw(Area::new(stack_bottom, stack_top).prot(Prot::RW))?;
+
+        let state = State::Ready;
+        trap_frame.sp = stack_top as u64;
+        trap_frame.set_ttbr(0, mm.ttbr());
+        //mem::forget(mm);
+        Some(Self { trap_frame, state, mm })
     }
+
     pub fn with_entry(entry: unsafe extern "C" fn () -> !) -> Option<Self> {
         Self::new().map(|mut p| {
             p.trap_frame.set_elr(entry);

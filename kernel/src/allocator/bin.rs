@@ -28,7 +28,7 @@ impl Allocator {
         }
     }
 
-    fn recycle(&mut self, mut ptr: usize, mut size: usize) {
+    fn _recycle(&mut self, mut ptr: usize, mut size: usize) {
         for i in (0..BIN_COUNT).rev() {
             let bin = 2usize.pow(3 + i as u32);
             while size % bin != 0 {

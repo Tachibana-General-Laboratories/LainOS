@@ -81,7 +81,7 @@ pub struct Gpio<State> {
 }
 
 /// The base address of the `GPIO` registers.
-pub const GPIO_BASE: usize = IO_BASE + 0x200000;
+pub const GPIO_BASE: usize = 0x200000;
 
 impl<T> Gpio<T> {
     /// Transitions `self` to state `S`, consuming `self` and returning a new
@@ -177,7 +177,7 @@ impl Gpio<Uninitialized> {
     ///
     /// Panics if `pin` > `53`.
     pub fn new(pin: u8) -> Self {
-        unsafe { Self::new_from(GPIO_BASE, pin) }
+        unsafe { Self::new_from(IO_BASE + GPIO_BASE, pin) }
     }
 
     /// Returns a new `GPIO` structure for pin number `pin`.

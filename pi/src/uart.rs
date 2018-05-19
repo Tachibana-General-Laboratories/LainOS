@@ -8,10 +8,10 @@ use common::IO_BASE;
 use gpio::{Gpio, Function};
 
 /// The base address for the `MU` registers.
-pub const MU_REG_BASE: usize = IO_BASE + 0x215040;
+pub const MU_REG_BASE: usize = 0x215040;
 
 /// The `AUXENB` register from page 9 of the BCM2837 documentation.
-pub const AUX_ENABLES: usize = IO_BASE + 0x215004;
+pub const AUX_ENABLES: usize = 0x215004;
 
 /// Enum representing bit fields of the `AUX_MU_LSR_REG` register.
 #[repr(u8)]
@@ -61,7 +61,7 @@ impl MiniUart {
     /// By default, reads will never time out. To set a read timeout, use
     /// `set_read_timeout()`.
     pub fn new() -> Self {
-        unsafe { Self::new_from(MU_REG_BASE, AUX_ENABLES) }
+        unsafe { Self::new_from(IO_BASE + MU_REG_BASE, IO_BASE + AUX_ENABLES) }
     }
 
     pub unsafe fn new_from(base: usize, aux: usize) -> Self {
